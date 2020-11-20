@@ -148,7 +148,7 @@ class LCR600 extends EventEmitter{
 							};
 
 						self._setAttribute(summary.name, summary.value);
-						self.emit('data', summary);
+						self._emit('data', summary);
 						break;
 
 					default:
@@ -212,21 +212,19 @@ class LCR600 extends EventEmitter{
 					if(summarize){
 						const data = _RECEIVED_DATA[summary.name];
 
-						if(self.listenerCount(summary.name) > 0){
-							// emit with field name, because summary is specific for each field name
-							self.emit(summary.name, {
-									name: summary.name,
-									value: {
-										meter: {
-											start: data.summary.value.start,
-											finish: data.summary.value.finish,
-											total: Math.abs(data.summary.value.total),
-										},
-										time: data.summary.time._summary,
+						// emit with field name, because summary is specific for each field name
+						self._emit(summary.name, {
+								name: summary.name,
+								value: {
+									meter: {
+										start: data.summary.value.start,
+										finish: data.summary.value.finish,
+										total: Math.abs(data.summary.value.total),
 									},
-									status,
-								});
-						}
+									time: data.summary.time._summary,
+								},
+								status,
+							});
 					}
 
 					self._setAttribute(summary.name, summary.value);
@@ -242,7 +240,7 @@ class LCR600 extends EventEmitter{
 
 				case 'TEXT':
 					self._setAttribute(summary.name, summary.value);
-					self._emit(field.type, summary);
+					self._emit('data', summary);
 					break;
 			}
 		} else{
