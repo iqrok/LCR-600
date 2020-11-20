@@ -1,0 +1,24 @@
+{
+	"name": "lcr600",
+	"version": "0.1.0",
+	"description": "Accessing LCR 600 device",
+	"main": "index.js",
+	"scripts": {
+		"start": "node ./test",
+		"test": "npm install && npm start"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://gitlab.com/iqrok/lcr-600"
+	},
+	"keywords": [
+		"LCR"
+	],
+	"author": "iqrok",
+	"license": "AGPL-3.0-or-later",
+	"dependencies": {
+		"@serialport/parser-inter-byte-timeout": "^9.0.1",
+		"date-and-time": "^0.14.1",
+		"serialport": "^9.0.1"
+	}
+}
