@@ -10,7 +10,7 @@ const LCR600 = new (require(`../index`))(config, config.debug);
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// succesfully parsing data, contains value
+// listener for each summary
 LCR600.on('GrossCount_NE', received => {
 	const data = {
 			...received,
@@ -25,16 +25,9 @@ LCR600.on('GrossCount_NE', received => {
 	console.log('---------------------------------------');
 });
 
-LCR600.on('LIST', received => {
-	console.dir(received);
-});
-
-LCR600.on('TEXT', received => {
-	console.dir(received);
-});
-
-LCR600.on('data', (received, data) => {
-	console.log('data:', received, data);
+// successfully parsing data
+LCR600.on('data', (received) => {
+	console.log('data:', received);
 	console.log('---------------------------------------');
 });
 
