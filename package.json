@@ -1,6 +1,6 @@
 {
 	"name": "lcr600",
-	"version": "0.1.0",
+	"version": "0.1.0-1",
 	"description": "Accessing LCR 600 device",
 	"main": "index.js",
 	"scripts": {
