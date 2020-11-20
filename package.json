@@ -9,13 +9,13 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://gitlab.com/iqrok/lcr-600"
+		"url": "https://github.com/iqrok/LCR-600"
 	},
 	"keywords": [
 		"LCR"
 	],
 	"author": "iqrok",
-	"license": "AGPL-3.0-or-later",
+	"license": "MIT",
 	"dependencies": {
 		"@serialport/parser-inter-byte-timeout": "^9.0.1",
 		"date-and-time": "^0.14.1",
