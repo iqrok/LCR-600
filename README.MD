@@ -1,18 +1,30 @@
-# LCR API Currently Supported
+# LCR 600 API
 
-## CONFIGURATION
+All data is via event driven process.
+
+List of event names:
+- __data__
+	emitted when received data from LCR 600 is succesfully parsed
+- __failed__
+	emitted when received data from LCR 600 cant be parsed, only contains LCR return code to troubleshoot
+- __field name__
+	emitted when value from number data type is changed. example of field names: _GrossQty_NE_, _NetQty_NE_, etc 
+
+## Example
 ```javascript
 const config = {
-        hostAddress: 0xff, // if this field is left empty, would be defaault to 0xff
-        LCRNodeAddress: 0x01, // LCR address device used
-        port: "/dev/ttyUSB0", // COM port where device is connected
-        baud: 19200 // default baud rate for LCR 600
-    };
+	hostAddress: 0xff, // if this field is left empty, would be defaault to 0xff
+	LCRNodeAddress: 0x01, // LCR address device used
+	port: "/dev/ttyUSB0", // COM port where device is connected
+	baud: 19200, // default baud rate for LCR 600
+	debug: true
+};
+
 const LCR600 = new (require(`../index`))(config, config.debug);
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// succesfully parsing data, contains value
+// listener for each summary
 LCR600.on('GrossCount_NE', received => {
 	const data = {
 			...received,
@@ -27,22 +39,15 @@ LCR600.on('GrossCount_NE', received => {
 	console.log('---------------------------------------');
 });
 
-LCR600.on('LIST', received => {
-	console.dir('LIST', received);
-});
-
-LCR600.on('TEXT', received => {
-	console.dir('TEXT', received);
-});
-
-LCR600.on('data', (received, data) => {
-	console.log('data', received, data);
+// successfully parsing data
+LCR600.on('data', (received) => {
+	console.log('data:', received);
 	console.log('---------------------------------------');
 });
 
 // failed when parsing data, only contains code for debugging purpose
 LCR600.on('failed', received => {
-	console.error('failed', received);
+	console.error('failed:', received);
 	console.log('---------------------------------------');
 });
 
@@ -62,7 +67,7 @@ LCR600.on('failed', received => {
 	await LCR600.requestAttribute('UnitID_UL');
 	await LCR600.requestAttribute('MeterID_WM');
 
-	console.log(LCR600.getAttribute());
+	console.log('List set attributes:', LCR600.getAttribute());
 	console.log('---------------------------------------');
 
 	// use setTimeout instead of setInterval due to async
@@ -73,6 +78,11 @@ LCR600.on('failed', received => {
 
 	// start infinite loop
 	__loop();
+
+	// exit process for testing purpose
+	setTimeout(() => {
+		process.exit(0);
+	}, 10000);
 })();
 ```
 
@@ -122,21 +132,21 @@ LCR600.on('failed', received => {
 |---|---|
 |0|°C|
 |1|°F|
-	
+
 ##### __LIST+11__
 |Number|Description|
 |---|---|
 |0|PER SECOND|
 |1|PER MINUTE|
 |2|PER HOUR|
-	
+
 ##### __LIST+14__
 |Number|Description|
 |---|---|
 |0|2 Digits|
 |1|1 Digit|
 |2|0 Digit|
-	
+
 ##### __LIST+21__
 |Number|Description|
 |---|---|
