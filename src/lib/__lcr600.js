@@ -148,7 +148,7 @@ class LCR600 extends EventEmitter{
 							};
 
 						self._setAttribute(summary.name, summary.value);
-						self.emit('data', summary, data);
+						self.emit('data', summary);
 						break;
 
 					default:
@@ -163,6 +163,19 @@ class LCR600 extends EventEmitter{
 	};
 
 	/*=========== PRIVATE METHODS ===========*/
+
+	/**
+	 *	emit data if only there is at least 1 listener
+	 *	@private
+	 *	@param {string} eventName - event name to be emitted
+	 *	@param {*} value - event data, any datatype can be emitted
+	 * */
+	_emit(eventName, value){
+		const self = this;
+		if(self.listenerCount(eventName) > 0){
+			self.emit(eventName, value);
+		}
+	};
 
 	/**
 	 *	Handle response from LCR600, and emit handled data
@@ -188,6 +201,11 @@ class LCR600 extends EventEmitter{
 				};
 
 			switch(type){
+				case 'LONG':
+				case 'FFLOAT':
+				case 'UFLOAT':
+				case 'SFLOAT':
+				case 'INTEGER':
 				case 'VOLUME':
 					const summarize = self._summarize(summary);
 
@@ -209,38 +227,29 @@ class LCR600 extends EventEmitter{
 									status,
 								});
 						}
-					} else{
-						if(self.listenerCount(type) > 0){
-							self.emit(type, summary);
-						}
 					}
+
+					self._setAttribute(summary.name, summary.value);
+					self._emit('data', summary);
+
 					break;
 
 				case 'LIST':
 					const parsedList = self._parseList(summary, field.n);
-
 					self._setAttribute(parsedList.name, parsedList.value);
-
-					if(self.listenerCount(type) > 0){
-						self.emit(type, parsedList);
-					}
+					self._emit('data', parsedList);
 					break;
 
 				case 'TEXT':
 					self._setAttribute(summary.name, summary.value);
-
-					if(self.listenerCount(type) > 0){
-						self.emit(field.type, summary);
-					}
+					self._emit(field.type, summary);
 					break;
 			}
 		} else{
-			if(self.listenerCount('failed') > 0){
-				self.emit('failed',{
-						name: self._getFieldNameById(field.id),
-						...self._parseReturnCodes(response.data.code),
-					});
-			}
+			self._emit('failed',{
+					name: self._getFieldNameById(field.id),
+					...self._parseReturnCodes(response.data.code),
+				});
 		}
 	};
 
