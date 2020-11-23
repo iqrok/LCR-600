@@ -6,7 +6,7 @@ const config = {
 	debug: true
 };
 
-const LCR600 = new (require(`../index`))(config, config.debug);
+const LCR600 = new (require(`../`))(config, config.debug);
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 

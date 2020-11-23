@@ -2,7 +2,7 @@
 	"name": "lcr600",
 	"version": "0.1.0-2",
 	"description": "Accessing LCR 600 device",
-	"main": "index.js",
+	"main": "src/lib/__lcr600.js",
 	"scripts": {
 		"start": "node ./test",
 		"test": "npm install && npm start"
@@ -18,6 +18,6 @@
 	"license": "MIT",
 	"dependencies": {
 		"@serialport/parser-inter-byte-timeout": "^9.0.1",
-		"serialport": "^9.0.1"
+		"serialport": "^8.0.8"
 	}
 }
