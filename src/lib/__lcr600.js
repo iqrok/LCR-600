@@ -119,15 +119,15 @@ class LCR600 extends EventEmitter{
 			}, self.debug);
 
 		self.serial.on('open', received => {
-			console.log(received);
+			self._emit('open', received);
 		});
 
 		self.serial.on('error', received => {
-			console.error(received);
+			self._emit('error', received);
 		});
 
 		self.serial.on('close', received => {
-			console.error(received);
+			self._emit('close', received);
 		});
 
 		self.serial.on('data', received => {
@@ -252,7 +252,7 @@ class LCR600 extends EventEmitter{
 	};
 
 	/**
-	 *	Parse Return Codes according to LCR API
+	 *	Parse Return Codes according to LCR API Docs
 	 *	@private
 	 *	@param {Number} code - return code from LCR API
 	 *	@returns {Object} - Object containing return code and its description
@@ -265,7 +265,7 @@ class LCR600 extends EventEmitter{
 	};
 
 	/**
-	 *	Parse LIST according to LCR API
+	 *	Parse LIST according to LCR API Docs
 	 *	@private
 	 *	@param {Object} summary - Parsed LCR600's response
 	 *	@param {Number} n - LIST index. See 'List Types' in LCR API document
@@ -406,6 +406,7 @@ class LCR600 extends EventEmitter{
 	 *	Request to LCR600 to get data via serialport. MessageId = 0x20
 	 *	@private
 	 *	@param {Number} fieldNum - LCR600's field number
+	 *	@param {Number} [sync=false] - set the synchroniztion bit
 	 *	@returns {Bool} - write status
 	 * */
 	_getFieldData(fieldNum, sync = false){
@@ -423,9 +424,30 @@ class LCR600 extends EventEmitter{
 	};
 
 	/**
+	 *	Set LCR600 Data field. MessageId = 0x21
+	 *	@private
+	 *	@param {Number} fieldNum - LCR600's field number
+	 *	@param {Number} [sync=false] - set the synchroniztion bit
+	 *	@returns {Bool} - write status
+	 * */
+	_setFieldData(fieldNum, sync = false){
+		const self = this;
+
+		const packet = self.CRCinit()
+			.to()
+			.from()
+			.identifier()
+			.sync(sync)
+			.data([0x21, fieldNum])
+			.build();
+
+		return self.serial.write(packet);
+	};
+
+	/**
 	 *	Parse LCR600 response. Read LCR API Document page #3
 	 *	@private
-	 *	@param {Number[]} raw - array of bytes
+	 *	@param {Number[]} raw - array of bytes from LCR600's response
 	 *	@returns {Object[]} - Parsed response
 	 * */
 	_parseResponse(raw){
@@ -481,7 +503,7 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Set LCR Node Address Destination. If addr null, will use what defined in config
 	 *	(Chained method)
-	 *	@param {Number} addr - address between 0x00 - 0xfa
+	 *	@param {Number} [addr=null] - address between 0x00 - 0xfa
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	to(addr = null){
@@ -493,7 +515,7 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Set Host Address. If addr null, will use what defined in config
 	 *	(Chained method)
-	 *	@param {Number} addr - address between 0x00 - 0xff
+	 *	@param {Number} [addr=null] - address between 0x00 - 0xff
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	from(addr = null){
@@ -519,7 +541,7 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Set synchronization status. Set to true only on first request
 	 *	(Chained method)
-	 *	@param {Bool} isSync - sync is true or false
+	 *	@param {Bool} [isSync=false] - Set the synchroniztion bit
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	sync(isSync = false){
@@ -605,23 +627,8 @@ class LCR600 extends EventEmitter{
 	/*=========== GENERAL METHODS ===========*/
 
 	/**
-	 *	Convert array of bytes to hexadecimal form. Used only to make read easier
-	 *	@param {Number[]} data - array of bytes
-	 *	@returns {String[]} - array of bytes in hex string
-	 * */
-	inHex(packet){
-		const _hex = [];
-
-		for(const byte of packet){
-			_hex.push(bitops.dec2hex(byte));
-		}
-
-		return _hex;
-	};
-
-	/**
 	 *	Request to LCR600 to get ProductId via serialport. MessageId = 0x00
-	 *	@param {Number} fieldNum - LCR600's field number
+	 *	@param {Bool} [sync=false] - Set the synchroniztion bit
 	 *	@returns {Bool} - write status
 	 * */
 	getProductID(sync = false){
@@ -641,6 +648,7 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Get Field Data
 	 *	@param {String} fieldName - fieldName is same as in LCR API Table page #26
+	 *	@param {Bool} [sync=false] - Set the synchroniztion bit
 	 *	@returns {Bool} - write status
 	 * */
 	getData(fieldName, sync = false){
@@ -680,7 +688,7 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Get attributes on current process
 	 *	@param {String} key - attribute's name
-	 *	@param {Bool} onlyValue - returns as object or value only
+	 *	@param {Bool} [onlyValue=true] - returns as object or value only
 	 *	@returns {Number|String|Object} - if key is falsy, return entire object, otherwise return defined key
 	 * */
 	getAttribute(key, onlyValue = true){
@@ -688,6 +696,73 @@ class LCR600 extends EventEmitter{
 		return key
 			? onlyValue ? self.attributes[key] : {[key]: self.attributes[key]}
 			: self.attributes;
+	};
+
+	/**
+	 *	Set the amount of milliseconds to wait until number data stays the same and considered as trigger to summarize data
+	 *	@param {Number} [msLimit=1000] - time to wait in milliseconds
+	 * */
+	setWaitingTime(msLimit = 1000){
+		const self = this;
+		self._msLimit = msLimit;
+	};
+
+	/**
+	 *	Set Device Address. MessageId = 0x25
+	 *	@throws Will throw Error if deviceAddress is not number
+	 *	@param {Number} deviceAddress - new LCR600's node address
+	 *	@returns {Bool} - write status
+	 * */
+	setDeviceAddress(deviceAddress){
+		const self = this;
+
+		if(typeof(deviceAddres) !== 'number'){
+			throw 'Device address must be a number data type';
+		}
+
+		const packet = self.CRCinit()
+			.to()
+			.from()
+			.identifier()
+			.sync()
+			.data([0x25, deviceAddres])
+			.build();
+
+		self.LCRNodeAddress = deviceAddress;
+
+		return self.serial.write(packet);
+	};
+
+	/**
+	 *	Set LCR600 Baud Rate. MessageId = 0x7C
+	 *	Accepted baudrates are 57600, 19200, 9600, 4800, and 2400
+	 *	@throws Will throw error if provided baud rate is not in accepted ones
+	 *	@param {Number} baudRate - new LCR600's baudRate
+	 *	@returns {Bool} - write status
+	 * */
+	setBaudRate(baudRate = 19200){
+		const self = this;
+		const baudIX = {
+				57600: 0,
+				19200: 1,
+				9600: 2,
+				4800: 3,
+				2400: 4,
+			};
+
+		if(baudIX[baudRate] == undefined){
+			throw 'Accpeted Baud Rate: 57600, 19200, 9600, 4800, 2400';
+		}
+
+		const packet = self.CRCinit()
+			.to()
+			.from()
+			.identifier()
+			.sync()
+			.data([0x7C, baudIX[baudRate]])
+			.build();
+
+		return self.serial.write(packet);
 	};
 }
 
