@@ -1,12 +1,13 @@
 const config = {
-	hostAddress: 0xff, // if this field is left empty, would be defaault to 0xff
+	hostAddress: 0xff, // if this field is left empty, would be default to 0xff
 	LCRNodeAddress: 0x01, // LCR address device used
 	port: "/dev/ttyUSB0", // COM port where device is connected
 	baud: 19200, // default baud rate for LCR 600
 	debug: true
 };
 
-const LCR600 = new (require(`../`))(config, config.debug);
+const lcr600 = require(`../`);
+const LCR600 = new (lcr600)(config, config.debug);
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -67,6 +68,7 @@ LCR600.on('failed', received => {
 
 	// exit process for testing purpose
 	setTimeout(() => {
+		console.log('Finished');
 		process.exit(0);
 	}, 10000);
 })();
