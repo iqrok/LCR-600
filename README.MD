@@ -1,6 +1,10 @@
-# LCR 600 API
+# [LCR 600 API]
 
-All data is via event driven process.
+> [LCR 600 Manual](https://www.lcmeter.com/sites/default/files/ES100-30_%28LCR%20600%29_0.pdf)
+
+All data is sent and set via event driven process.
+
+You should connect to LCR600 with RS-232. Won't work with Serial TTL Voltage level
 
 List of event names:
 - __data__
@@ -8,19 +12,46 @@ List of event names:
 - __failed__
 	emitted when received data from LCR 600 cant be parsed, only contains LCR return code to troubleshoot
 - __field name__
-	emitted when value from number data type is changed. example of field names: _GrossQty_NE_, _NetQty_NE_, etc 
+	emitted when value from number data type is changed. example of field names: _GrossQty_NE_, _NetQty_NE_, etc
+
+## Installation
+```bash
+npm install lcr600
+```
+
+## Usage
+```javascript
+const lcr600 = require('lcr600');
+const LCR600 = new lcr600({
+		hostAddress: 0xff,
+		LCRNodeAddress: 0x01,
+		port: "/dev/ttyUSB0",
+		baud: 19200,
+		debug: true
+	});
+```
+
+## Configuration
+|Field||Default|Description|
+|---|---|---|---|
+|hostAddress|Optional|0xff|Host address|
+|LCRNodeAddress|Optional|0x00|LCR Node Address|
+|port|Mandatory|-|Port used to communicate with LCR600|
+|baud|Optional|19200|LCR600 Baud Rate|
+|debug|Optional|false|Debugging Serial Communication|
 
 ## Example
 ```javascript
 const config = {
-	hostAddress: 0xff, // if this field is left empty, would be defaault to 0xff
+	hostAddress: 0xff, // if this field is left empty, would be default to 0xff
 	LCRNodeAddress: 0x01, // LCR address device used
 	port: "/dev/ttyUSB0", // COM port where device is connected
 	baud: 19200, // default baud rate for LCR 600
-	debug: true
+	debug: true // optional. Default to false
 };
 
-const LCR600 = new (require(`../index`))(config, config.debug);
+const lcr600 = require('lcr600');
+const LCR600 = new lcr600(config, config.debug);
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
