@@ -95,6 +95,7 @@ class LCR600 extends EventEmitter{
 		self.LCRNodeAddress = config.LCRNodeAddress ? config.LCRNodeAddress : 0x00;
 		self.hostAddress = config.hostAddress ? config.hostAddress : 0xff;
 		self.config = config;
+		self.config.baud = config.baud || 19200;
 		self.debug = debug;
 		self.message = new __TEMPLATE__(self.LCRNodeAddress, self.hostAddress);
 		self.attributes = {};
