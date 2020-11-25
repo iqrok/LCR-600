@@ -136,6 +136,42 @@ class LCR600 extends EventEmitter{
 
 			if(self._currentField != undefined){
 				self._handleResponseField(response);
+			} else if(self._messageId != undefined){
+				switch(self._messageId){
+					// Product Id Request
+					case 0x00:
+						const summary = {
+								name: 'productId',
+								value: self._readFieldData(fieldData, 'TEXT'),
+							};
+
+						self._setAttribute(summary.name, summary.value);
+						self._emit('data', summary);
+						break;
+
+					// Set Field Request
+					case 0x21:
+						break;
+
+					// Device Status Request
+					case 0x23:
+						break;
+
+					// Set Device Address Request
+					case 0x25:
+						break;
+
+					// Set Baud Rate Request
+					case 0x7C:
+						break;
+
+					default:
+						// message id will mostly probably 0x20, try to call _handleResponseField()
+						self._handleResponseField(response);
+						break;
+				}
+
+				self._messageId = undefined;
 			} else{
 				const {data} = response;
 				const {status, fieldData} = data;
@@ -413,12 +449,14 @@ class LCR600 extends EventEmitter{
 	_getFieldData(fieldNum, sync = false){
 		const self = this;
 
+		self._messageId = 0x20;
+
 		const packet = self.CRCinit()
 			.to()
 			.from()
 			.identifier()
 			.sync(sync)
-			.data([0x20, fieldNum])
+			.data([self._messageId, fieldNum])
 			.build();
 
 		return self.serial.write(packet);
@@ -434,12 +472,14 @@ class LCR600 extends EventEmitter{
 	_setFieldData(fieldNum, sync = false){
 		const self = this;
 
+		self._messageId = 0x21;
+
 		const packet = self.CRCinit()
 			.to()
 			.from()
 			.identifier()
 			.sync(sync)
-			.data([0x21, fieldNum])
+			.data([self._messageId, fieldNum])
 			.build();
 
 		return self.serial.write(packet);
@@ -635,12 +675,35 @@ class LCR600 extends EventEmitter{
 	getProductID(sync = false){
 		const self = this;
 
+		self._messageId = 0x00;
+
 		const packet = self.CRCinit()
 			.to()
 			.from()
 			.identifier()
 			.sync(sync)
-			.data([0x00])
+			.data([self._messageId])
+			.build();
+
+		return self.serial.write(packet);
+	};
+
+	/**
+	 *	Request to LCR600 to get Device Status via serialport. MessageId = 0x23
+	 *	@param {Bool} [sync=false] - Set the synchroniztion bit
+	 *	@returns {Bool} - write status
+	 * */
+	getDeviceStatus(sync = false){
+		const self = this;
+
+		self._messageId = 0x23;
+
+		const packet = self.CRCinit()
+			.to()
+			.from()
+			.identifier()
+			.sync(sync)
+			.data([self._messageId])
 			.build();
 
 		return self.serial.write(packet);
@@ -721,12 +784,14 @@ class LCR600 extends EventEmitter{
 			throw 'Device address must be a number data type';
 		}
 
+		self._messageId = 0x25;
+
 		const packet = self.CRCinit()
 			.to()
 			.from()
 			.identifier()
 			.sync()
-			.data([0x25, deviceAddres])
+			.data([self._messageId, deviceAddres])
 			.build();
 
 		self.LCRNodeAddress = deviceAddress;
@@ -755,12 +820,14 @@ class LCR600 extends EventEmitter{
 			throw 'Accpeted Baud Rate: 57600, 19200, 9600, 4800, 2400';
 		}
 
+		self._messageId = 0x7C
+
 		const packet = self.CRCinit()
 			.to()
 			.from()
 			.identifier()
 			.sync()
-			.data([0x7C, baudIX[baudRate]])
+			.data([self._messageId, baudIX[baudRate]])
 			.build();
 
 		return self.serial.write(packet);
