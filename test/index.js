@@ -3,11 +3,12 @@ const config = {
 	LCRNodeAddress: 0x01, // LCR address device used
 	port: "/dev/ttyUSB0", // COM port where device is connected
 	baud: 19200, // default baud rate for LCR 600
-	debug: true
+	debug: true,
+	interval: 100,
 };
 
 const lcr600 = require(`../`);
-const LCR600 = new (lcr600)(config, config.debug);
+const LCR600 = new lcr600(config, config.debug);
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -38,6 +39,35 @@ LCR600.on('failed', received => {
 	console.log('---------------------------------------');
 });
 
+// Listener when port is opened
+LCR600.on('open', received => {
+	console.log('open:', received);
+	console.log('---------------------------------------');
+});
+
+// Listener when port is closed
+LCR600.on('close', received => {
+	console.log('close:', received);
+	console.log('---------------------------------------');
+});
+
+// Listener when port is error
+LCR600.on('error', received => {
+	console.error('error:', received);
+	console.log('---------------------------------------');
+});
+
+// failed when parsing data, only contains code for debugging purpose
+LCR600.on('switch', received => {
+	console.error('switch change:', received);
+
+	if(received.from.code === 0x01 && received.to.code === 0x02){
+		LCR600.interruptSummary('GrossCount_NE');
+	}
+
+	console.log('---------------------------------------');
+});
+
 (async() => {
 	const interval = config.interval || 100;
 
@@ -57,6 +87,9 @@ LCR600.on('failed', received => {
 	console.log('List set attributes:', LCR600.getAttribute());
 	console.log('---------------------------------------');
 
+	// set waiting for flow to be steady to 10 seconds
+	LCR600.setWaitingTime(10000);
+
 	// use setTimeout instead of setInterval due to async
 	const __loop = async () => {
 		await LCR600.getData('GrossCount_NE');
@@ -68,7 +101,7 @@ LCR600.on('failed', received => {
 
 	// exit process for testing purpose
 	setTimeout(() => {
-		console.log('Finished');
-		process.exit(0);
-	}, 10000);
+			console.log('Finished');
+			process.exit(0);
+		}, 10000);
 })();
