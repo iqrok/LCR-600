@@ -62,6 +62,12 @@ const _LIST = require(`../LCR_constants/LCR.list`);
 /** Return Codes Description from LCR API **/
 const _RCODES = require(`../LCR_constants/LCR.rcodes`);
 
+/** Machine Code Bits Description from LCR API **/
+const _MACHINECODES = require(`../LCR_constants/LCR.machineCodes`);
+
+/** Message ID Description from LCR API **/
+const _MESSAGEID = require(`../LCR_constants/LCR.messageId`);
+
 /** Variable to store parsed LCR600's responses **/
 const _RECEIVED_DATA = {};
 
@@ -132,74 +138,98 @@ class LCR600 extends EventEmitter{
 		});
 
 		self.serial.on('data', received => {
-			const response = self._parseResponse(received);
-
-			if(self._currentField != undefined){
-				self._handleResponseField(response);
-			} else if(self._messageId != undefined){
-				switch(self._messageId){
-					// Product Id Request
-					case 0x00:
-						const summary = {
-								name: 'productId',
-								value: self._readFieldData(fieldData, 'TEXT'),
-							};
-
-						self._setAttribute(summary.name, summary.value);
-						self._emit('data', summary);
-						break;
-
-					// Set Field Request
-					case 0x21:
-						break;
-
-					// Device Status Request
-					case 0x23:
-						break;
-
-					// Set Device Address Request
-					case 0x25:
-						break;
-
-					// Set Baud Rate Request
-					case 0x7C:
-						break;
-
-					default:
-						// message id will mostly probably 0x20, try to call _handleResponseField()
-						self._handleResponseField(response);
-						break;
-				}
-
-				self._messageId = undefined;
-			} else{
-				const {data} = response;
-				const {status, fieldData} = data;
-
-				switch(status){
-					// status = 0x02 : handle Product Id response
-					case 0x02:
-						const summary = {
-								name: 'productId',
-								value: self._readFieldData(fieldData, 'TEXT'),
-							};
-
-						self._setAttribute(summary.name, summary.value);
-						self._emit('data', summary);
-						break;
-
-					default:
-						// status byte is not listed, try to call _handleResponseField()
-						self._handleResponseField(response);
-						break;
-				}
-			}
+			self._parseReceivedSerial(received);
 		});
 
 		await self.serial.connect();
 	};
 
 	/*=========== PRIVATE METHODS ===========*/
+
+	/**
+	 *	Parse received serial response from LCR600
+	 *	@private
+	 *	@param {Array<byte>} received - array of bytes received from LCR600
+	 * */
+	_parseReceivedSerial(received){
+		const self = this;
+		const response = self._parseResponse(received);
+
+		if(response.data.code !== 0){
+			self._unsuccessfulResponse(self._messageId, response);
+			return;
+		}
+
+		if(self._messageId != undefined){
+			switch(self._messageId){
+				// Product Id Request
+				case 0x00:
+					const {status, fieldData} = response.data;
+
+					const summary = {
+							name: 'productId',
+							value: self._readFieldData(fieldData, 'TEXT'),
+						};
+
+					self._setAttribute(summary.name, summary.value);
+					self._emit('data', summary);
+					break;
+
+				// Get Field Request
+				case 0x20:
+					self._handleResponseField(response);
+					break;
+
+				// Set Field Request
+				case 0x21:
+					break;
+
+				// Device Status Request
+				case 0x23:
+					console.log('device status', response);
+					console.log('device data', response.data);
+					console.log('device code', self._parseReturnCodes(response.data.code));
+					console.log('------------------------------');
+					break;
+
+				// Set Device Address Request
+				case 0x25:
+					break;
+
+				// Set Baud Rate Request
+				case 0x7C:
+					break;
+
+				default:
+					// message id will mostly probably 0x20, try to call _handleResponseField()
+					self._handleResponseField(response);
+					break;
+			}
+
+			self._messageId = undefined;
+		} else{
+			const {data} = response;
+			const {status, fieldData} = data;
+
+			switch(status){
+				// status = 0x02 : handle Product Id response
+				case 0x02:
+					const summary = {
+							name: 'productId',
+							value: self._readFieldData(fieldData, 'TEXT'),
+						};
+
+					self._setAttribute(summary.name, summary.value);
+					self._emit('data', summary);
+					break;
+
+				default:
+					// status byte is not listed, try to call _handleResponseField()
+					self._handleResponseField(response);
+					break;
+			}
+		}
+	};
 
 	/**
 	 *	emit data if only there is at least 1 listener
@@ -215,76 +245,101 @@ class LCR600 extends EventEmitter{
 	};
 
 	/**
-	 *	Handle response from LCR600, and emit handled data
+	 *	Handle response when code is not 0
 	 *	@private
-	 *	@param {Object} response - received response from LCR600
+	 *	@param {number} messageId - current requested message id
+	 *	@param {Object} response - Parsed LCR600's response
 	 * */
-	_handleResponseField(response){
+	_unsuccessfulResponse(messageId, response){
 		const self = this;
-		const {code, status, fieldData} = response.data;
 
-		// code:0 means request was completed successfully
-		if(code === 0){
+		if(self._currentField != undefined){
 			const field = self._currentField;
 
 			// remove _currentField only if success, because LCR600 will send response on queued request
 			self._currentField = undefined;
 
-			const type = field.type.toUpperCase();
-			const summary = {
-					name: self._getFieldNameById(field.id),
-					value: self._readFieldData(fieldData, field.type),
-					status,
-				};
-
-			switch(type){
-				case 'LONG':
-				case 'FFLOAT':
-				case 'UFLOAT':
-				case 'SFLOAT':
-				case 'INTEGER':
-				case 'VOLUME':
-					const summarize = self._summarize(summary);
-
-					if(summarize){
-						const data = _RECEIVED_DATA[summary.name];
-
-						// emit with field name, because summary is specific for each field name
-						self._emit(summary.name, {
-								name: summary.name,
-								value: {
-									meter: {
-										start: data.summary.value.start,
-										finish: data.summary.value.finish,
-										total: Math.abs(data.summary.value.total),
-									},
-									time: data.summary.time._summary,
-								},
-								status,
-							});
-					}
-
-					self._setAttribute(summary.name, summary.value);
-					self._emit('data', summary);
-
-					break;
-
-				case 'LIST':
-					const parsedList = self._parseList(summary, field.n);
-					self._setAttribute(parsedList.name, parsedList.value);
-					self._emit('data', parsedList);
-					break;
-
-				case 'TEXT':
-					self._setAttribute(summary.name, summary.value);
-					self._emit('data', summary);
-					break;
-			}
-		} else{
 			self._emit('failed',{
+					id: _MESSAGEID[messageId],
 					name: self._getFieldNameById(field.id),
 					...self._parseReturnCodes(response.data.code),
 				});
+		} else {
+			self._emit('failed',{
+					id: _MESSAGEID[messageId],
+					...self._parseReturnCodes(response.data.code),
+				});
+		}
+	};
+
+	/**
+	 *	Handle response from LCR600, and emit handled data
+	 *	@private
+	 *	@param {Object} response - Parsed LCR600's response
+	 * */
+	_handleResponseField(response){
+		const self = this;
+		const {code, status, fieldData} = response.data;
+
+		// if current field is empty, handling data will throw error. Return false instead
+		if(self._currentField == undefined){
+			return false;
+		}
+
+		const field = self._currentField;
+
+		// remove _currentField only if success, because LCR600 will send response on queued request
+		self._currentField = undefined;
+
+		const type = field.type.toUpperCase();
+		const summary = {
+				name: self._getFieldNameById(field.id),
+				value: self._readFieldData(fieldData, field.type),
+				status,
+			};
+
+		switch(type){
+			case 'LONG':
+			case 'FFLOAT':
+			case 'UFLOAT':
+			case 'SFLOAT':
+			case 'INTEGER':
+			case 'VOLUME':
+				const summarize = self._summarize(summary);
+
+				if(summarize){
+					const data = _RECEIVED_DATA[summary.name];
+
+					// emit with field name, because summary is specific for each field name
+					self._emit(summary.name, {
+							name: summary.name,
+							value: {
+								meter: {
+									start: data.summary.value.start,
+									finish: data.summary.value.finish,
+									total: Math.abs(data.summary.value.total),
+								},
+								time: data.summary.time._summary,
+							},
+							status,
+						});
+				}
+
+				self._setAttribute(summary.name, summary.value);
+				self._emit('data', summary);
+
+				break;
+
+			case 'LIST':
+				const parsedList = self._parseList(summary, field.n);
+				self._setAttribute(parsedList.name, parsedList.value);
+				self._emit('data', parsedList);
+				break;
+
+			case 'TEXT':
+				self._setAttribute(summary.name, summary.value);
+				self._emit('data', summary);
+				break;
 		}
 	};
 
@@ -297,14 +352,14 @@ class LCR600 extends EventEmitter{
 	_parseReturnCodes(code){
 		return {
 				code,
-				msg: _RCODES[code] ? _RCODES[code] : undefined,
+				description: _RCODES[code] ? _RCODES[code] : undefined,
 			};
 	};
 
 	/**
 	 *	Parse LIST according to LCR API Docs
 	 *	@private
-	 *	@param {Object} summary - Parsed LCR600's response
+	 *	@param {Object} summary - Summary of Parsed LCR600's response
 	 *	@param {Number} n - LIST index. See 'List Types' in LCR API document
 	 *	@returns {Object} - parsed LIST name and value
 	 * */
@@ -507,7 +562,17 @@ class LCR600 extends EventEmitter{
 				return code === 0
 					? {
 						code,
-						status: this._data[1],
+						status: {
+							code: this._data[1],
+							_switch: {
+								code: this._data[1] & 0x0f,
+								description: _MACHINECODES.SWITCH[this._data[1] & 0x0f],
+							},
+							_state: {
+								code: this._data[1] & 0xf0,
+								description: _MACHINECODES.STATE[this._data[1] & 0xf0],
+							},
+						},
 						fieldData: this._data.slice(2),
 					}
 					: {code};
