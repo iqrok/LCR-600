@@ -348,7 +348,7 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Parse Return Codes according to LCR API Docs
 	 *	@private
-	 *	@param {Number} code - return code from LCR API
+	 *	@param {number} code - return code from LCR API
 	 *	@returns {Object} - Object containing return code and its description
 	 * */
 	_parseReturnCodes(code){
@@ -362,7 +362,7 @@ class LCR600 extends EventEmitter{
 	 *	Parse LIST according to LCR API Docs
 	 *	@private
 	 *	@param {Object} summary - Summary of Parsed LCR600's response
-	 *	@param {Number} n - LIST index. See 'List Types' in LCR API document
+	 *	@param {number} n - LIST index. See 'List Types' in LCR API document
 	 *	@returns {Object} - parsed LIST name and value
 	 * */
 	_parseList(summary, n){
@@ -377,7 +377,7 @@ class LCR600 extends EventEmitter{
 	 *	Parse VOLUME type and calculate summary when VOLUME value is changing
 	 *	@private
 	 *	@param {Object} data - Parsed LCR600's response
-	 *	@returns {Bool} - current process is finished or not
+	 *	@returns {boolean} - current process is finished or not
 	 * */
 	_summarize(data){
 		const self = this;
@@ -437,9 +437,9 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Read buffer according to its type
 	 *	@private
-	 *	@param {Buffer} buffer - buffer from LCR600's response
-	 *	@param {String} type - buffer type
-	 *	@returns {Number|String} - Translated Buffer
+	 *	@param {Array<byte>} buffer - buffer from LCR600's response
+	 *	@param {string} type - buffer type
+	 *	@returns {number|string} - Translated Buffer
 	 * */
 	_readFieldData(buffer, type){
 		try{
@@ -488,8 +488,8 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Get field name by id
 	 *	@private
-	 *	@param {Number} id - Field id number
-	 *	@returns {String} - field's name
+	 *	@param {number} id - Field id number
+	 *	@returns {string} - field's name
 	 * */
 	_getFieldNameById(id){
 		const self = this;
@@ -509,47 +509,35 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Request to LCR600 to get data via serialport. MessageId = 0x20
 	 *	@private
-	 *	@param {Number} fieldNum - LCR600's field number
-	 *	@param {Number} [sync=false] - set the synchroniztion bit
-	 *	@returns {Bool} - write status
+	 *	@param {number} fieldNum - LCR600's field number
+	 *	@param {number} [sync=false] - set the synchroniztion bit
+	 *	@returns {boolean} - write status
 	 * */
 	_getFieldData(fieldNum, sync = false){
 		const self = this;
 
 		self._messageId = 0x20;
 
-		const packet = self.CRCinit()
-			.to()
-			.from()
-			.identifier()
-			.sync(sync)
-			.data([self._messageId, fieldNum])
-			.build();
+		const packet = self._buildPacket([self._messageId, fieldNum], sync);
 
-		return self.serial.write(packet);
+		return self._request(packet);
 	};
 
 	/**
 	 *	Set LCR600 Data field. MessageId = 0x21
 	 *	@private
-	 *	@param {Number} fieldNum - LCR600's field number
-	 *	@param {Number} [sync=false] - set the synchroniztion bit
-	 *	@returns {Bool} - write status
+	 *	@param {number} fieldNum - LCR600's field number
+	 *	@param {number} [sync=false] - set the synchroniztion bit
+	 *	@returns {boolean} - write status
 	 * */
 	_setFieldData(fieldNum, sync = false){
 		const self = this;
 
 		self._messageId = 0x21;
 
-		const packet = self.CRCinit()
-			.to()
-			.from()
-			.identifier()
-			.sync(sync)
-			.data([self._messageId, fieldNum])
-			.build();
+		const packet = self._buildPacket([self._messageId, fieldNum], sync);
 
-		return self.serial.write(packet);
+		return self._request(packet);
 	};
 
 	/**
@@ -631,14 +619,45 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Set attributes on current process
 	 *	@private
-	 *	@param {String} key - attribute's name
-	 *	@param {Number|String} value - attribute's value
+	 *	@param {string} key - attribute's name
+	 *	@param {number|string} value - attribute's value
 	 *	@returns {Object} - current process's attributes
 	 * */
 	_setAttribute(key, value){
 		const self = this;
 		self.attributes[key] = value;
 		return self.attributes[key];
+	};
+
+	/**
+	 *	Build message packet to send to LCR
+	 *	@private
+	 *	@param {Array<byte>} message - message id and required field data
+	 *	@param {boolean} [sync=false] - Set the synchroniztion bit
+	 *	@returns {Array<byte>} - Built Packet
+	 * */
+	_buildPacket(message, sync = false){
+		const self = this;
+		return self._messageId == undefined
+			? false
+			: self.begin()
+				.to()
+				.from()
+				.identifier()
+				.sync(sync)
+				.data(message)
+				.build();
+	};
+
+	/**
+	 *	Hit LCR API if packet is not false
+	 *	@private
+	 *	@param {Array<byte>} packet - Built Packet
+	 *	@returns {boolean} - Write Status
+	 * */
+	_request(packet){
+		const self = this;
+		return packet ? self.serial.write(packet) : false;
 	};
 
 	/*=========== METHODS FOR BUILDING PACKET ===========*/
@@ -648,7 +667,7 @@ class LCR600 extends EventEmitter{
 	 *	(Chained method)
 	 *	@returns {Object} - returns this for chaining
 	 * */
-	CRCinit(){
+	begin(){
 		this.CRC = __HEADER__ << 8 | __HEADER__;
 		return this;
 	};
@@ -656,7 +675,7 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Set LCR Node Address Destination. If addr null, will use what defined in config
 	 *	(Chained method)
-	 *	@param {Number} [addr=null] - address between 0x00 - 0xfa
+	 *	@param {number} [addr=null] - address between 0x00 - 0xfa
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	to(addr = null){
@@ -668,7 +687,7 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Set Host Address. If addr null, will use what defined in config
 	 *	(Chained method)
-	 *	@param {Number} [addr=null] - address between 0x00 - 0xff
+	 *	@param {number} [addr=null] - address between 0x00 - 0xff
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	from(addr = null){
@@ -694,7 +713,7 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Set synchronization status. Set to true only on first request
 	 *	(Chained method)
-	 *	@param {Bool} [isSync=false] - Set the synchroniztion bit
+	 *	@param {boolean} [isSync=false] - Set the synchroniztion bit
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	sync(isSync = false){
@@ -781,51 +800,39 @@ class LCR600 extends EventEmitter{
 
 	/**
 	 *	Request to LCR600 to get ProductId via serialport. MessageId = 0x00
-	 *	@param {Bool} [sync=false] - Set the synchroniztion bit
-	 *	@returns {Bool} - write status
+	 *	@param {boolean} [sync=false] - Set the synchroniztion bit
+	 *	@returns {boolean} - write status
 	 * */
 	getProductID(sync = false){
 		const self = this;
 
 		self._messageId = 0x00;
 
-		const packet = self.CRCinit()
-			.to()
-			.from()
-			.identifier()
-			.sync(sync)
-			.data([self._messageId])
-			.build();
+		const packet = self._buildPacket([self._messageId]);
 
-		return self.serial.write(packet);
+		return self._request(packet);
 	};
 
 	/**
 	 *	Request to LCR600 to get Device Status via serialport. MessageId = 0x23
-	 *	@param {Bool} [sync=false] - Set the synchroniztion bit
-	 *	@returns {Bool} - write status
+	 *	@param {boolean} [sync=false] - Set the synchroniztion bit
+	 *	@returns {boolean} - write status
 	 * */
 	getDeviceStatus(sync = false){
 		const self = this;
 
 		self._messageId = 0x23;
 
-		const packet = self.CRCinit()
-			.to()
-			.from()
-			.identifier()
-			.sync(sync)
-			.data([self._messageId])
-			.build();
+		const packet = self._buildPacket([self._messageId]);
 
-		return self.serial.write(packet);
+		return self._request(packet);
 	};
 
 	/**
 	 *	Get Field Data
-	 *	@param {String} fieldName - fieldName is same as in LCR API Table page #26
-	 *	@param {Bool} [sync=false] - Set the synchroniztion bit
-	 *	@returns {Bool} - write status
+	 *	@param {string} fieldName - fieldName is same as in LCR API Table page #26
+	 *	@param {boolean} [sync=false] - Set the synchroniztion bit
+	 *	@returns {boolean} - write status
 	 * */
 	getData(fieldName, sync = false){
 		if(!fieldName){
@@ -840,7 +847,7 @@ class LCR600 extends EventEmitter{
 
 	/**
 	 *	Request attributes from LCR600, i.e. Meter Id, unit in use, etc
-	 *	@param {String} fieldName - Field Name of requested attribute value
+	 *	@param {string} fieldName - Field Name of requested attribute value
 	 *	@returns {Object} - current process's attributes
 	 * */
 	requestAttribute(fieldName){
@@ -854,7 +861,7 @@ class LCR600 extends EventEmitter{
 							resolve(__requestData());
 						}, 100);
 				} else{
-					resolve(self.attributes)
+					resolve(self.attributes);
 				}
 			});
 
@@ -863,8 +870,8 @@ class LCR600 extends EventEmitter{
 
 	/**
 	 *	Get attributes on current process
-	 *	@param {String} key - attribute's name
-	 *	@param {Bool} [onlyValue=true] - returns as object or value only
+	 *	@param {string} key - attribute's name
+	 *	@param {boolean} [onlyValue=true] - returns as object or value only
 	 *	@returns {Number|String|Object} - if key is falsy, return entire object, otherwise return defined key
 	 * */
 	getAttribute(key, onlyValue = true){
@@ -876,7 +883,7 @@ class LCR600 extends EventEmitter{
 
 	/**
 	 *	Set the amount of milliseconds to wait until number data stays the same and considered as trigger to summarize data
-	 *	@param {Number} [msLimit=1000] - time to wait in milliseconds
+	 *	@param {number} [msLimit=1000] - time to wait in milliseconds
 	 * */
 	setWaitingTime(msLimit = 1000){
 		const self = this;
@@ -886,39 +893,35 @@ class LCR600 extends EventEmitter{
 	/**
 	 *	Set Device Address. MessageId = 0x25
 	 *	@throws Will throw Error if deviceAddress is not number
-	 *	@param {Number} deviceAddress - new LCR600's node address
-	 *	@returns {Bool} - write status
+	 *	@param {number} deviceAddress - new LCR600's node address
+	 *	@param {number} [sync=false] - set the synchroniztion bit
+	 *	@returns {boolean} - write status
 	 * */
-	setDeviceAddress(deviceAddress){
+	setDeviceAddress(deviceAddress, sync = false){
 		const self = this;
 
-		if(typeof(deviceAddres) !== 'number'){
+		if(typeof(deviceAddress) !== 'number'){
 			throw 'Device address must be a number data type';
 		}
 
 		self._messageId = 0x25;
 
-		const packet = self.CRCinit()
-			.to()
-			.from()
-			.identifier()
-			.sync()
-			.data([self._messageId, deviceAddres])
-			.build();
+		const packet = self._buildPacket([self._messageId, deviceAddress], sync);
 
 		self.LCRNodeAddress = deviceAddress;
 
-		return self.serial.write(packet);
+		return self._request(packet);
 	};
 
 	/**
 	 *	Set LCR600 Baud Rate. MessageId = 0x7C
 	 *	Accepted baudrates are 57600, 19200, 9600, 4800, and 2400
 	 *	@throws Will throw error if provided baud rate is not in accepted ones
-	 *	@param {Number} baudRate - new LCR600's baudRate
-	 *	@returns {Bool} - write status
+	 *	@param {number} baudRate - new LCR600's baudRate
+	 *	@param {number} [sync=false] - set the synchroniztion bit
+	 *	@returns {boolean} - write status
 	 * */
-	setBaudRate(baudRate = 19200){
+	setBaudRate(baudRate = 19200, sync = false){
 		const self = this;
 		const baudIX = {
 				57600: 0,
@@ -934,21 +937,15 @@ class LCR600 extends EventEmitter{
 
 		self._messageId = 0x7C
 
-		const packet = self.CRCinit()
-			.to()
-			.from()
-			.identifier()
-			.sync()
-			.data([self._messageId, baudIX[baudRate]])
-			.build();
+		const packet = self._buildPacket([self._messageId, baudIX[baudRate]], sync);
 
-		return self.serial.write(packet);
+		return self._request(packet);
 	};
 
 	/**
 	 *	Interrupr summary calculation. Call if you want to ger summary immediately wihtout waiting for waitingTime to be elapsed
 	 *	@param {string} fieldName - field name which summary want to be interrupted
-	 *	@returns {Bool} - write status
+	 *	@returns {boolean} - write status
 	 * */
 	interruptSummary(fieldName){
 		const self = this;
