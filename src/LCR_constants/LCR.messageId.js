@@ -1,8 +1,1 @@
-module.exports = {
-	0x00: 'productId',
-	0x20: 'getFieldData',
-	0x21: 'setFieldData',
-	0x23: 'getDeviceStatus',
-	0x25: 'setDeviceAddress',
-	0x7c: 'setBaudRate',
-};
+module.exports={0:"productId",32:"getFieldData",33:"setFieldData",35:"getDeviceStatus",37:"setDeviceAddress",124:"setBaudRate"};
