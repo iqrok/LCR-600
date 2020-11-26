@@ -253,23 +253,25 @@ class LCR600 extends EventEmitter{
 	_unsuccessfulResponse(messageId, response){
 		const self = this;
 
-		if(self._currentField != undefined){
-			const field = self._currentField;
+		self._emit('failed', (()=>{
+				if(self._currentField != undefined){
+					const field = self._currentField;
 
-			// remove _currentField only if success, because LCR600 will send response on queued request
-			self._currentField = undefined;
+					// remove _currentField only if success, because LCR600 will send response on queued request
+					self._currentField = undefined;
 
-			self._emit('failed',{
-					id: _MESSAGEID[messageId],
-					name: self._getFieldNameById(field.id),
-					...self._parseReturnCodes(response.data.code),
-				});
-		} else {
-			self._emit('failed',{
-					id: _MESSAGEID[messageId],
-					...self._parseReturnCodes(response.data.code),
-				});
-		}
+					return {
+						id: _MESSAGEID[messageId],
+						name: self._getFieldNameById(field.id),
+						...self._parseReturnCodes(response.data.code),
+					};
+				} else {
+					return {
+						id: _MESSAGEID[messageId],
+						...self._parseReturnCodes(response.data.code),
+					};
+				}
+			})());
 	};
 
 	/**
@@ -405,14 +407,24 @@ class LCR600 extends EventEmitter{
 		}
 
 		// process is assumed as finished when lastValue is same as currentValue for ${self._msLimit}ms
-		if(_RECEIVED_DATA[data.name].onProcess && _RECEIVED_DATA[data.name].lastValue === data.value && (Date.now() - _RECEIVED_DATA[data.name].sameValueTimer) > self._msLimit){
+		if(
+			_RECEIVED_DATA[data.name].onProcess
+			&& _RECEIVED_DATA[data.name].lastValue === data.value
+			&& ((Date.now() - _RECEIVED_DATA[data.name].sameValueTimer) > self._msLimit || self._interruptSummarize === data.name)
+		){
 			// assign last value when process is finished
 			_RECEIVED_DATA[data.name].summary.value.finish = data.value;
-			_RECEIVED_DATA[data.name].summary.time.finish = new Date(Date.now() - self._msLimit); // finished time is compensated with delay ms
+			_RECEIVED_DATA[data.name].summary.time.finish = new Date(Date.now() - (self._interruptSummarize === data.name ? 0 : self._msLimit)); // finished time is compensated with delay ms
 			_RECEIVED_DATA[data.name].onProcess = false;
 
 			// reset counter
 			_RECEIVED_DATA[data.name].sameValueTimer = Date.now();
+
+			// reset interrupt summary name
+			if(self._interruptSummarize === data.name){
+				self._interruptSummarize = undefined;
+			}
+
 			status |= true;
 		}
 
@@ -586,16 +598,19 @@ class LCR600 extends EventEmitter{
 
 		// emit & change last switch pos, if only switch pos is not 0x00 (BETWEEN)
 		if(switchByte !== self._lastSwitchByte && switchByte !== 0x00){
-			self._emit('switch', {
-					from: {
-						code: self._lastSwitchByte,
-						description: _MACHINE_STATUS.DEVICE_STATUS.SWITCH[self._lastSwitchByte],
-					},
-					to: {
-						code: switchByte,
-						description: _MACHINE_STATUS.DEVICE_STATUS.SWITCH[switchByte],
-					},
-				});
+			// dont emit on startup, when last switch pos is still undefined
+			if(self._lastSwitchByte != undefined){
+				self._emit('switch', {
+						from: {
+							code: self._lastSwitchByte,
+							description: _MACHINE_STATUS.DEVICE_STATUS.SWITCH[self._lastSwitchByte],
+						},
+						to: {
+							code: switchByte,
+							description: _MACHINE_STATUS.DEVICE_STATUS.SWITCH[switchByte],
+						},
+					});
+			}
 
 			self._lastSwitchByte = switchByte;
 		}
@@ -928,6 +943,19 @@ class LCR600 extends EventEmitter{
 			.build();
 
 		return self.serial.write(packet);
+	};
+
+	/**
+	 *	Interrupr summary calculation. Call if you want to ger summary immediately wihtout waiting for waitingTime to be elapsed
+	 *	@param {string} fieldName - field name which summary want to be interrupted
+	 *	@returns {Bool} - write status
+	 * */
+	interruptSummary(fieldName){
+		const self = this;
+		self._interruptSummarize = fieldName;
+
+		// exec getData in order to get summary calculated
+		return self.getData(fieldName);
 	};
 }
 
