@@ -63,7 +63,7 @@ const _LIST = require(`../LCR_constants/LCR.list`);
 const _RCODES = require(`../LCR_constants/LCR.rcodes`);
 
 /** Machine Code Bits Description from LCR API **/
-const _MACHINECODES = require(`../LCR_constants/LCR.machineCodes`);
+const _MACHINE_STATUS = require(`../LCR_constants/LCR.machineStatus`);
 
 /** Message ID Description from LCR API **/
 const _MESSAGEID = require(`../LCR_constants/LCR.messageId`);
@@ -547,6 +547,7 @@ class LCR600 extends EventEmitter{
 	 *	@returns {Object[]} - Parsed response
 	 * */
 	_parseResponse(raw){
+		const self = this;
 		const len = raw.length;
 
 		return {
@@ -562,22 +563,53 @@ class LCR600 extends EventEmitter{
 				return code === 0
 					? {
 						code,
-						status: {
-							code: this._data[1],
-							_switch: {
-								code: this._data[1] & 0x0f,
-								description: _MACHINECODES.SWITCH[this._data[1] & 0x0f],
-							},
-							_state: {
-								code: this._data[1] & 0xf0,
-								description: _MACHINECODES.STATE[this._data[1] & 0xf0],
-							},
-						},
+						status: self._parsedDevStatus(this._data[1]),
 						fieldData: this._data.slice(2),
 					}
 					: {code};
 			},
 			CRC: [raw[len-2], raw[len-1]]
+		};
+	};
+
+	/**
+	 *	Parsed device status in data packet
+	 *	@private
+	 *	@param {byte} _byte - device status byte
+	 *	@returns {Object} - current device status
+	 * */
+	_parsedDevStatus(_byte){
+		const self = this;
+
+		const switchByte = _byte & 0x0f;
+		const stateByte = _byte & 0xf0;
+
+		// emit & change last switch pos, if only switch pos is not 0x00 (BETWEEN)
+		if(switchByte !== self._lastSwitchByte && switchByte !== 0x00){
+			self._emit('switch', {
+					from: {
+						code: self._lastSwitchByte,
+						description: _MACHINE_STATUS.DEVICE_STATUS.SWITCH[self._lastSwitchByte],
+					},
+					to: {
+						code: switchByte,
+						description: _MACHINE_STATUS.DEVICE_STATUS.SWITCH[switchByte],
+					},
+				});
+
+			self._lastSwitchByte = switchByte;
+		}
+
+		return {
+			code: _byte,
+			switch: {
+				code: switchByte,
+				description: _MACHINE_STATUS.DEVICE_STATUS.SWITCH[switchByte],
+			},
+			state: {
+				code: stateByte,
+				description: _MACHINE_STATUS.DEVICE_STATUS.STATE[stateByte],
+			},
 		};
 	};
 
