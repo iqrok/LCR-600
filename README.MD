@@ -1,6 +1,6 @@
-# [LCR 600 API]
+# LCR 600 API
 
-> [LCR 600 Manual](https://www.lcmeter.com/sites/default/files/ES100-30_%28LCR%20600%29_0.pdf)
+### [LectroCount® LCR®600](https://www.lcmeter.com/products/registration-software/electronic-registration/lectrocount-lcr-600)
 
 All data is sent and set via event driven process.
 
