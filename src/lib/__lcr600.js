@@ -206,8 +206,10 @@ class LCR600 extends EventEmitter{
 					break;
 			}
 
+			// clear _messageId to mark that request has been completed
 			self._messageId = undefined;
-		} else{
+
+		} else {
 			const {data} = response;
 			const {status, fieldData} = data;
 
@@ -631,6 +633,7 @@ class LCR600 extends EventEmitter{
 
 	/**
 	 *	Build message packet to send to LCR
+	 *	Will return null if _messageId is not cleared, meaning previous request isn't completed yet
 	 *	@private
 	 *	@param {Array<byte>} message - message id and required field data
 	 *	@param {boolean} [sync=false] - Set the synchroniztion bit
@@ -638,8 +641,8 @@ class LCR600 extends EventEmitter{
 	 * */
 	_buildPacket(message, sync = false){
 		const self = this;
-		return self._messageId == undefined
-			? false
+		return self._messageId != undefined
+			? null
 			: self.begin()
 				.to()
 				.from()
