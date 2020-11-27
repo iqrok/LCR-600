@@ -29,7 +29,8 @@ LCR600.on('GrossCount_NE', received => {
 
 // successfully parsing data
 LCR600.on('data', (received) => {
-	console.log('data:', received);
+	console.log('data:');
+	console.log(received);
 	console.log('---------------------------------------');
 });
 
@@ -76,9 +77,6 @@ LCR600.on('switch', received => {
 
 	// get Product Id and Set synchronization
 	await LCR600.getProductID(true);
-	// wait to make sure communication with LCR600 is finished
-	await sleep(200);
-
 	// Set attributes data from LCR600
 	await LCR600.requestAttribute('QtyUnits_WM');
 	await LCR600.requestAttribute('UnitID_UL');
@@ -89,6 +87,9 @@ LCR600.on('switch', received => {
 
 	// set waiting for flow to be steady to 10 seconds
 	LCR600.setWaitingTime(10000);
+
+	await LCR600.getDeviceStatus();
+	await LCR600.getData('GrossCount_NE');
 
 	// use setTimeout instead of setInterval due to async
 	const __loop = async () => {
