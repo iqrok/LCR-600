@@ -1,7 +1,7 @@
 const EventEmitter = require('events');
 
 const bitops = require(`../class/bitOperations.class`);
-const __serial = require(`../class/serial.class`);
+const __serial = require('@iqrok/serial.helper');
 
 /** Constants used in building request packet **/
 const __HEADER__ = 0x7E;
@@ -154,8 +154,9 @@ class LCR600 extends EventEmitter{
 	_parseReceivedSerial(received){
 		const self = this;
 		const response = self._parseResponse(received);
+		const {code, status, fieldData} = response.data;
 
-		if(response.data.code !== 0){
+		if(code !== 0){
 			self._unsuccessfulResponse(self._messageId, response);
 			return;
 		}
@@ -164,8 +165,6 @@ class LCR600 extends EventEmitter{
 			switch(self._messageId){
 				// Product Id Request
 				case 0x00:
-					const {status, fieldData} = response.data;
-
 					const summary = {
 							name: 'productId',
 							value: self._readFieldData(fieldData, 'TEXT'),
@@ -186,10 +185,11 @@ class LCR600 extends EventEmitter{
 
 				// Device Status Request
 				case 0x23:
-					console.log('device status', response);
-					console.log('device data', response.data);
-					console.log('device code', self._parseReturnCodes(response.data.code));
-					console.log('------------------------------');
+					self._emit('data', {
+							name: 'machineStatus',
+							status: self._parseReturnCodes(code),
+							value: self._parseMachineStatus([...fieldData]),
+						});
 					break;
 
 				// Set Device Address Request
@@ -207,27 +207,6 @@ class LCR600 extends EventEmitter{
 			}
 
 			self._messageId = undefined;
-		} else{
-			const {data} = response;
-			const {status, fieldData} = data;
-
-			switch(status){
-				// status = 0x02 : handle Product Id response
-				case 0x02:
-					const summary = {
-							name: 'productId',
-							value: self._readFieldData(fieldData, 'TEXT'),
-						};
-
-					self._setAttribute(summary.name, summary.value);
-					self._emit('data', summary);
-					break;
-
-				default:
-					// status byte is not listed, try to call _handleResponseField()
-					self._handleResponseField(response);
-					break;
-			}
 		}
 	};
 
@@ -261,14 +240,20 @@ class LCR600 extends EventEmitter{
 					self._currentField = undefined;
 
 					return {
-						id: _MESSAGEID[messageId],
-						name: self._getFieldNameById(field.id),
 						...self._parseReturnCodes(response.data.code),
+						name: self._getFieldNameById(field.id),
+						messageId: {
+							code: messageId,
+							description: _MESSAGEID[messageId],
+						},
 					};
 				} else {
 					return {
-						id: _MESSAGEID[messageId],
 						...self._parseReturnCodes(response.data.code),
+						messageId: {
+							code: messageId,
+							description: _MESSAGEID[messageId],
+						},
 					};
 				}
 			})());
@@ -516,9 +501,9 @@ class LCR600 extends EventEmitter{
 	_getFieldData(fieldNum, sync = false){
 		const self = this;
 
-		self._messageId = 0x20;
+		const messageId = 0x20;
 
-		const packet = self._buildPacket([self._messageId, fieldNum], sync);
+		const packet = self._buildPacket([messageId, fieldNum], sync);
 
 		return self._request(packet);
 	};
@@ -533,9 +518,9 @@ class LCR600 extends EventEmitter{
 	_setFieldData(fieldNum, sync = false){
 		const self = this;
 
-		self._messageId = 0x21;
+		const messageId = 0x21;
 
-		const packet = self._buildPacket([self._messageId, fieldNum], sync);
+		const packet = self._buildPacket([messageId, fieldNum], sync);
 
 		return self._request(packet);
 	};
@@ -617,6 +602,43 @@ class LCR600 extends EventEmitter{
 	};
 
 	/**
+	 *	Parsed machine status bytes received after requesting device staus
+	 *	@private
+	 *	@param {Array<byte>} _bytes - fieldData in form of array, not buffer
+	 *	@returns {Object} - current machine status
+	 * */
+	_parseMachineStatus(_bytes){
+		const codes = {
+			printerStatus : _bytes[0],
+			deliveryStatus : {
+				raw: Buffer.from([_bytes[1], _bytes[2]]).readUInt16BE(),
+				high: _bytes[1] << 8,
+				low: _bytes[2],
+			},
+			deliveryCode : {
+				raw: Buffer.from([_bytes[3], _bytes[4]]).readUInt16BE(),
+				high: _bytes[3] << 8,
+				low: _bytes[4],
+			},
+		};
+
+		return {
+				printerStatus: {
+					code: codes.printerStatus,
+					description: _MACHINE_STATUS.PRINTER_STATUS[codes.printerStatus],
+				},
+				deliveryStatus: {
+					code: codes.deliveryStatus.raw,
+					description: _MACHINE_STATUS.DELIVERY_STATUS[codes.deliveryStatus.high] + ' ' + _MACHINE_STATUS.DELIVERY_STATUS[codes.deliveryStatus.low],
+				},
+				deliveryCode: {
+					code: codes.deliveryCode.raw,
+					description: _MACHINE_STATUS.DELIVERY_CODE[codes.deliveryCode.high] + ' ' + _MACHINE_STATUS.DELIVERY_CODE[codes.deliveryCode.low],
+				},
+			};
+	};
+
+	/**
 	 *	Set attributes on current process
 	 *	@private
 	 *	@param {string} key - attribute's name
@@ -638,9 +660,10 @@ class LCR600 extends EventEmitter{
 	 * */
 	_buildPacket(message, sync = false){
 		const self = this;
-		return self._messageId == undefined
-			? false
-			: self.begin()
+
+		self._messageId = message[0];
+
+		return self.begin()
 				.to()
 				.from()
 				.identifier()
@@ -657,7 +680,22 @@ class LCR600 extends EventEmitter{
 	 * */
 	_request(packet){
 		const self = this;
-		return packet ? self.serial.write(packet) : false;
+		const __waitForResponse = async function(){
+				return new Promise(async resolve => {
+					await self.serial.write(packet);
+
+					if(self._messageId == undefined){
+						resolve(true);
+						return;
+					}
+
+					setTimeout(async () => {
+							resolve(__waitForResponse())
+						}, 100);
+				});
+			};
+
+		return __waitForResponse();
 	};
 
 	/*=========== METHODS FOR BUILDING PACKET ===========*/
@@ -806,9 +844,9 @@ class LCR600 extends EventEmitter{
 	getProductID(sync = false){
 		const self = this;
 
-		self._messageId = 0x00;
+		const messageId = 0x00;
 
-		const packet = self._buildPacket([self._messageId]);
+		const packet = self._buildPacket([messageId]);
 
 		return self._request(packet);
 	};
@@ -821,9 +859,9 @@ class LCR600 extends EventEmitter{
 	getDeviceStatus(sync = false){
 		const self = this;
 
-		self._messageId = 0x23;
+		const messageId = 0x23;
 
-		const packet = self._buildPacket([self._messageId]);
+		const packet = self._buildPacket([messageId]);
 
 		return self._request(packet);
 	};
@@ -852,20 +890,7 @@ class LCR600 extends EventEmitter{
 	 * */
 	requestAttribute(fieldName){
 		const self = this;
-
-		const __requestData = () => new Promise(async (resolve, reject) => {
-				await self.getData(fieldName);
-
-				if(!self.attributes[fieldName]){
-					setTimeout(()=>{
-							resolve(__requestData());
-						}, 100);
-				} else{
-					resolve(self.attributes);
-				}
-			});
-
-		return __requestData();
+		return self.getData(fieldName);
 	};
 
 	/**
@@ -904,9 +929,9 @@ class LCR600 extends EventEmitter{
 			throw 'Device address must be a number data type';
 		}
 
-		self._messageId = 0x25;
+		const messageId = 0x25;
 
-		const packet = self._buildPacket([self._messageId, deviceAddress], sync);
+		const packet = self._buildPacket([messageId, deviceAddress], sync);
 
 		self.LCRNodeAddress = deviceAddress;
 
@@ -935,15 +960,15 @@ class LCR600 extends EventEmitter{
 			throw 'Accpeted Baud Rate: 57600, 19200, 9600, 4800, 2400';
 		}
 
-		self._messageId = 0x7C
+		const messageId = 0x7C
 
-		const packet = self._buildPacket([self._messageId, baudIX[baudRate]], sync);
+		const packet = self._buildPacket([messageId, baudIX[baudRate]], sync);
 
 		return self._request(packet);
 	};
 
 	/**
-	 *	Interrupr summary calculation. Call if you want to ger summary immediately wihtout waiting for waitingTime to be elapsed
+	 *	Interrupt summary calculation. Call if you want to ger summary immediately wihtout waiting for waitingTime to be elapsed
 	 *	@param {string} fieldName - field name which summary want to be interrupted
 	 *	@returns {boolean} - write status
 	 * */
