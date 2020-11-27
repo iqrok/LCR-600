@@ -516,9 +516,9 @@ class LCR600 extends EventEmitter{
 	_getFieldData(fieldNum, sync = false){
 		const self = this;
 
-		self._messageId = 0x20;
+		const messageId = 0x20;
 
-		const packet = self._buildPacket([self._messageId, fieldNum], sync);
+		const packet = self._buildPacket([messageId, fieldNum], sync);
 
 		return self._request(packet);
 	};
@@ -533,9 +533,9 @@ class LCR600 extends EventEmitter{
 	_setFieldData(fieldNum, sync = false){
 		const self = this;
 
-		self._messageId = 0x21;
+		const messageId = 0x21;
 
-		const packet = self._buildPacket([self._messageId, fieldNum], sync);
+		const packet = self._buildPacket([messageId, fieldNum], sync);
 
 		return self._request(packet);
 	};
@@ -732,8 +732,13 @@ class LCR600 extends EventEmitter{
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	data(data = [0x00]){
-		this.message.data = data;
-		this.message.length = this.message.data.length;
+		const self = this;
+
+		// data[0] is where message id located
+		self._messageId = data[0];
+
+		self.message.data = data;
+		self.message.length = self.message.data.length;
 
 		return this;
 	};
@@ -806,9 +811,9 @@ class LCR600 extends EventEmitter{
 	getProductID(sync = false){
 		const self = this;
 
-		self._messageId = 0x00;
+		const messageId = 0x00;
 
-		const packet = self._buildPacket([self._messageId]);
+		const packet = self._buildPacket([messageId]);
 
 		return self._request(packet);
 	};
@@ -821,9 +826,9 @@ class LCR600 extends EventEmitter{
 	getDeviceStatus(sync = false){
 		const self = this;
 
-		self._messageId = 0x23;
+		const messageId = 0x23;
 
-		const packet = self._buildPacket([self._messageId]);
+		const packet = self._buildPacket([messageId]);
 
 		return self._request(packet);
 	};
@@ -904,9 +909,9 @@ class LCR600 extends EventEmitter{
 			throw 'Device address must be a number data type';
 		}
 
-		self._messageId = 0x25;
+		const messageId = 0x25;
 
-		const packet = self._buildPacket([self._messageId, deviceAddress], sync);
+		const packet = self._buildPacket([messageId, deviceAddress], sync);
 
 		self.LCRNodeAddress = deviceAddress;
 
@@ -935,9 +940,9 @@ class LCR600 extends EventEmitter{
 			throw 'Accpeted Baud Rate: 57600, 19200, 9600, 4800, 2400';
 		}
 
-		self._messageId = 0x7C
+		const messageId = 0x7C
 
-		const packet = self._buildPacket([self._messageId, baudIX[baudRate]], sync);
+		const packet = self._buildPacket([messageId, baudIX[baudRate]], sync);
 
 		return self._request(packet);
 	};
