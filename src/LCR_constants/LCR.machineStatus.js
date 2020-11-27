@@ -25,6 +25,7 @@ module.exports = {
 	},
 
 	PRINTER_STATUS: {
+		0x00: 'SUCCESS',
 		0x01: 'DELIVERY_TICKET',
 		0x02: 'SHIFT_TICKET',
 		0x04: 'DIAGNOSTIC_TICKET',
