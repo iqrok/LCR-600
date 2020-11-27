@@ -1,6 +1,6 @@
 {
 	"name": "lcr600",
-	"version": "0.2.2",
+	"version": "0.2.3",
 	"description": "Accessing LCR 600 device",
 	"main": "src/lib/__lcr600.js",
 	"scripts": {
@@ -17,7 +17,6 @@
 	"author": "iqrok",
 	"license": "MIT",
 	"dependencies": {
-		"@serialport/parser-inter-byte-timeout": "^9.0.1",
-		"serialport": "^9.0.2"
+		"@iqrok/serial.helper": "^0.1.0"
 	}
 }
