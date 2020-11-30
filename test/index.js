@@ -10,8 +10,6 @@ const config = {
 const lcr600 = require(`../`);
 const LCR600 = new lcr600(config, config.debug);
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 // listener for each summary
 LCR600.on('GrossCount_NE', received => {
 	const data = {
@@ -77,19 +75,20 @@ LCR600.on('switch', received => {
 
 	// get Product Id and Set synchronization
 	await LCR600.getProductID(true);
+
 	// Set attributes data from LCR600
+	await LCR600.requestAttribute('Decimals_WM');
 	await LCR600.requestAttribute('QtyUnits_WM');
 	await LCR600.requestAttribute('UnitID_UL');
 	await LCR600.requestAttribute('MeterID_WM');
+	await LCR600.requestAttribute('Printer_WM');
+	await LCR600.requestAttribute('SerialID_FL');
 
 	console.log('List set attributes:', LCR600.getAttribute());
 	console.log('---------------------------------------');
 
 	// set waiting for flow to be steady to 10 seconds
 	LCR600.setWaitingTime(10000);
-
-	await LCR600.getDeviceStatus();
-	await LCR600.getData('GrossCount_NE');
 
 	// use setTimeout instead of setInterval due to async
 	const __loop = async () => {

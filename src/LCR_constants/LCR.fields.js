@@ -98,6 +98,19 @@ module.exports = {
 			id: 45,
 			type: 'VOLUME',
 		},
+	Printer_WM: {
+			id: 56,
+			type: 'LIST',
+			n: 19,
+		},
+	SupplyVoltage_NE: {
+			id: 68,
+			type: 'UFLOAT',
+		},
+	SerialID_FL: {
+			id: 80,
+			type: 'TEXT',
+		},
 	AvgFlowRate: {
 			id: 126,
 			type: 'VOLUME',

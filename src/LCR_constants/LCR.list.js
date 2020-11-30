@@ -22,6 +22,14 @@ module.exports = {
 		1: 1,
 		2: 0,
 	},
+	19: {
+		0: 'Epson NewFontB',
+		1: 'Epson NewFontA',
+		2: 'Epson OldFontA',
+		3: 'Epson OldFontB',
+		4: 'Okidata Microline 184 Turbo ',
+		5: 'Blaster',
+	},
 	21: {
 		0: 'RIGHT',
 		1: 'LEFT',
