@@ -1,6 +1,6 @@
 {
 	"name": "lcr600",
-	"version": "0.2.3",
+	"version": "0.3.0",
 	"description": "Accessing LCR 600 device",
 	"main": "src/lib/__lcr600.js",
 	"scripts": {
@@ -17,6 +17,7 @@
 	"author": "iqrok",
 	"license": "MIT",
 	"dependencies": {
-		"@iqrok/serial.helper": "^0.1.0"
+		"@iqrok/binnum": "^1.0.0",
+		"@iqrok/serial.helper": "^0.2.0"
 	}
 }
