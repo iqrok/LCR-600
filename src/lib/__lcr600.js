@@ -1,6 +1,6 @@
 const EventEmitter = require('events');
 
-const bitops = require(`../class/bitOperations.class`);
+const binNum = require('@iqrok/binnum');
 const __serial = require('@iqrok/serial.helper');
 
 /** Constants used in building request packet **/
@@ -108,6 +108,8 @@ class LCR600 extends EventEmitter{
 
 		self._currentField = undefined;
 		self._msLimit = 1000;
+
+		self._resetRequestDelay();
 	};
 
 	/**
@@ -145,6 +147,35 @@ class LCR600 extends EventEmitter{
 	};
 
 	/*=========== PRIVATE METHODS ===========*/
+
+	/**
+	 *	Reset delay between request
+	 *	@private
+	 *	@param {number} [ms=75] - amount of delay in milliseconds
+	 * */
+	_resetRequestDelay(ms = 75){
+		const self = this;
+		self._requestDelay = ms;
+	};
+
+	/**
+	 *	Get current delay between request, and increase it for the next same request.
+	 * 	To make sure has time to response, before getting next request
+	 * 	Maximum delay is 150ms
+	 *	@private
+	 * 	@return {number} - current amount of delay in milliseconds
+	 * */
+	_currentRequestDelay(){
+		const self = this;
+		const _ms = self._requestDelay;
+		const _maxDelay = 150;
+
+		if(self._requestDelay++ > _maxDelay){
+			self._requestDelay = _maxDelay
+		}
+
+		return _ms;
+	};
 
 	/**
 	 *	Parse received serial response from LCR600
@@ -207,6 +238,7 @@ class LCR600 extends EventEmitter{
 			}
 
 			self._messageId = undefined;
+			self._resetRequestDelay();
 		}
 	};
 
@@ -689,9 +721,10 @@ class LCR600 extends EventEmitter{
 						return;
 					}
 
-					setTimeout(async () => {
-							resolve(__waitForResponse())
-						}, 100);
+					setTimeout(
+							() => resolve(__waitForResponse()),
+							self._currentRequestDelay()
+						);
 				});
 			};
 
@@ -740,8 +773,7 @@ class LCR600 extends EventEmitter{
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	identifier(){
-		this.message.status = bitops
-			.use(this.message.status)
+		this.message.status = binNum(this.message.status)
 			.bit(0)
 			.toggle();
 
@@ -755,8 +787,7 @@ class LCR600 extends EventEmitter{
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	sync(isSync = false){
-		this.message.status = bitops
-			.use(this.message.status)
+		this.message.status = binNum(this.message.status)
 			.bit(1)
 			.set(+isSync);
 
