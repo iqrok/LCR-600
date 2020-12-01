@@ -223,6 +223,15 @@ class LCR600 extends EventEmitter{
 						});
 					break;
 
+				// Issue Command Request
+				case 0x24:
+					self._emit('data', {
+							name: 'issueCommand',
+							status: self._parseReturnCodes(code),
+						});
+
+					break;
+
 				// Set Device Address Request
 				case 0x25:
 					break;
@@ -497,7 +506,7 @@ class LCR600 extends EventEmitter{
 					break;
 			};
 		} catch(error){
-			console.error('_readFieldData Error:', buffer, error);
+			console.error('_readFieldData Error:', this._messageId, buffer, error);
 			return null;
 		}
 	};
@@ -696,12 +705,12 @@ class LCR600 extends EventEmitter{
 		self._messageId = message[0];
 
 		return self.begin()
-				.to()
-				.from()
-				.identifier()
-				.sync(sync)
-				.data(message)
-				.build();
+			.to()
+			.from()
+			.identifier()
+			.sync(sync)
+			.data(message)
+			.build();
 	};
 
 	/**
@@ -991,7 +1000,7 @@ class LCR600 extends EventEmitter{
 			throw 'Accpeted Baud Rate: 57600, 19200, 9600, 4800, 2400';
 		}
 
-		const messageId = 0x7C
+		const messageId = 0x7C;
 
 		const packet = self._buildPacket([messageId, baudIX[baudRate]], sync);
 
@@ -1009,6 +1018,33 @@ class LCR600 extends EventEmitter{
 
 		// exec getData in order to get summary calculated
 		return self.getData(fieldName);
+	};
+
+	/**
+	 *	Issue command to LCR600
+	 *	@param {number|string} command - command code or string
+	 *	@param {number} [sync=false] - set the synchroniztion bit
+	 *	@returns {boolean} - write status
+	 * */
+	issueCommand(command, sync = false){
+		const self = this;
+
+		const commandCode = (() => {
+				if(typeof(command) === 'string'){
+					for(const key in _MACHINE_STATUS.COMMAND_BYTE){
+						if(_MACHINE_STATUS.COMMAND_BYTE[key] == command.toUpperCase()){
+							return key;
+						}
+					}
+				}
+
+				return command;
+			})();
+
+		const messageId = 0x24;
+		const packet = self._buildPacket([messageId, commandCode], sync);
+
+		return self._request(packet);
 	};
 }
 
