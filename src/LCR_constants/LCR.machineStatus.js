@@ -1,4 +1,14 @@
 module.exports = {
+	COMMAND_BYTE: {
+		0x00: 'START',
+		0x01: 'PAUSE',
+		0x02: 'PRINT',
+		0x03: 'AUX',
+		0x04: 'SHIFT_PRINT',
+		0x05: 'CALIBRATION',
+		0x06: 'PRINT_NOT_END',
+	},
+
 	DEVICE_STATUS: {
 		SWITCH: {
 			0x00: 'BETWEEN',
