@@ -1,7 +1,7 @@
 module.exports = {
 	COMMAND_BYTE: {
-		0x00: 'START',
-		0x01: 'PAUSE',
+		0x00: 'RUN',
+		0x01: 'STOP',
 		0x02: 'PRINT',
 		0x03: 'AUX',
 		0x04: 'SHIFT_PRINT',
