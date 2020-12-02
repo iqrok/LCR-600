@@ -103,12 +103,9 @@ class LCR600 extends EventEmitter{
 		self.config = config;
 		self.config.baud = config.baud || 19200;
 		self.debug = debug;
+		self.message = new __TEMPLATE__(self.LCRNodeAddress, self.hostAddress);
 		self.attributes = {};
 
-		self._message = undefined;
-		self._CRC = undefined;
-
-		self._issuedCommand = undefined;
 		self._currentField = undefined;
 		self._msLimit = 1000;
 
@@ -228,17 +225,11 @@ class LCR600 extends EventEmitter{
 
 				// Issue Command Request
 				case 0x24:
-					if(self._issuedCommand != undefined){
-						self._emit('switch', {
-								issued: {
-									status: self._parseReturnCodes(code),
-									values: self._issuedCommand,
-								},
-							});
+					self._emit('data', {
+							name: 'issueCommand',
+							status: self._parseReturnCodes(code),
+						});
 
-						// reset _issuedCommand for next event
-						self._issuedCommand = undefined;
-					}
 					break;
 
 				// Set Device Address Request
@@ -752,90 +743,81 @@ class LCR600 extends EventEmitter{
 	/*=========== METHODS FOR BUILDING PACKET ===========*/
 
 	/**
-	 *	Init CRC when requesting to LCR600 (Chained method)
-	 *	@private
+	 *	Init CRC when requesting to LCR600
+	 *	(Chained method)
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	begin(){
-		const self = this;
-
-		self._message = new __TEMPLATE__(self.LCRNodeAddress, self.hostAddress);
-		self._CRC = __HEADER__ << 8 | __HEADER__;
-
-		return self;
+		this.CRC = __HEADER__ << 8 | __HEADER__;
+		return this;
 	};
 
 	/**
-	 *	Set LCR Node Address Destination. If addr null, will use what defined in config (Chained method)
-	 *	@private
+	 *	Set LCR Node Address Destination. If addr null, will use what defined in config
+	 *	(Chained method)
 	 *	@param {number} [addr=null] - address between 0x00 - 0xfa
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	to(addr = null){
-		const self = this;
-		self._message.to = addr != null ? addr : self.LCRNodeAddress;
+		this.message.to = addr != null ? addr : this.LCRNodeAddress;
 
-		return self;
+		return this;
 	};
 
 	/**
-	 *	Set Host Address. If addr null, will use what defined in config (Chained method)
-	 *	@private
+	 *	Set Host Address. If addr null, will use what defined in config
+	 *	(Chained method)
 	 *	@param {number} [addr=null] - address between 0x00 - 0xff
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	from(addr = null){
-		const self = this;
-		self._message.from = addr != null ? addr : self.hostAddress;
+		this.message.from = addr != null ? addr : this.hostAddress;
 
-		return self;
+		return this;
 	};
 
 	/**
-	 *	Toggle message identifier, to differentiate between messages (Chained method)
-	 *	@private
+	 *	Toggle message identifier, to differentiate between messages
+	 *	(Chained method)
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	identifier(){
-		const self = this;
-		self._message.status = binNum(self._message.status)
+		this.message.status = binNum(this.message.status)
 			.bit(0)
 			.toggle();
 
-		return self;
+		return this;
 	};
 
 	/**
-	 *	Set synchronization status. Set to true only on first request (Chained method)
-	 *	@private
+	 *	Set synchronization status. Set to true only on first request
+	 *	(Chained method)
 	 *	@param {boolean} [isSync=false] - Set the synchroniztion bit
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	sync(isSync = false){
-		const self = this;
-		self._message.status = binNum(self._message.status)
+		this.message.status = binNum(this.message.status)
 			.bit(1)
 			.set(+isSync);
 
-		return self;
+		return this;
 	};
 
 	/**
-	 *	Set data to request (Chained method)
-	 *	@private
+	 *	Set data to request
+	 *	(Chained method)
 	 *	@param {Number[]} data - data must be in form of array of bytes
 	 *	@returns {Object} - returns this for chaining
 	 * */
 	data(data = [0x00]){
-		const self = this;
-		self._message.data = data;
-		self._message.length = self._message.data.length;
+		this.message.data = data;
+		this.message.length = this.message.data.length;
 
-		return self;
+		return this;
 	};
 
 	/**
-	 *	Build request packet, including calculating CRC. Finish Chained method
+	 *	Build request packet, including calculating CRC
 	 *	@returns {Number[]} - built request packet to send to LCR600
 	 * */
 	build(){
@@ -846,15 +828,15 @@ class LCR600 extends EventEmitter{
 		 *	Update CRC value when appending byte into packet
 		 * */
 		const updateCRC = (byte) => {
-			if(self._CRC != null){
+			if(self.CRC != null){
 				for(let bit = 7; bit >= 0; --bit){
-					const XORFlag = (self._CRC & 0x8000) != 0x0000;
+					const XORFlag = (self.CRC & 0x8000) != 0x0000;
 
-					self._CRC <<= 1;
-					self._CRC |= (byte >> bit) & 0x01;
+					self.CRC <<= 1;
+					self.CRC |= (byte >> bit) & 0x01;
 
 					if(XORFlag){
-						self._CRC ^= __POLYNOMIAL__;
+						self.CRC ^= __POLYNOMIAL__;
 					}
 				}
 			}
@@ -878,8 +860,8 @@ class LCR600 extends EventEmitter{
 				return appended;
 			};
 
-		for(const key in self._message){
-			const item = self._message[key];
+		for(const key in self.message){
+			const item = self.message[key];
 			message.push(...appendBytes(Array.isArray(item) ? item : [item]));
 		}
 
@@ -887,8 +869,8 @@ class LCR600 extends EventEmitter{
 				__HEADER__,
 				__HEADER__,
 				...message,
-				(self._CRC & 0x00FF) >> 0,
-				(self._CRC & 0xFF00) >> 8,
+				(self.CRC & 0x00FF) >> 0,
+				(self.CRC & 0xFF00) >> 8,
 			];
 	};
 
@@ -1040,7 +1022,6 @@ class LCR600 extends EventEmitter{
 
 	/**
 	 *	Issue command to LCR600
-	 *	@throws Will throw Error if command is not valid
 	 *	@param {number|string} command - command code or string
 	 *	@param {number} [sync=false] - set the synchroniztion bit
 	 *	@returns {boolean} - write status
@@ -1048,30 +1029,20 @@ class LCR600 extends EventEmitter{
 	issueCommand(command, sync = false){
 		const self = this;
 
-		self._issuedCommand = (() => {
-				if(!Number.isInteger(command) && typeof(command) === 'string'){
+		const commandCode = (() => {
+				if(typeof(command) === 'string'){
 					for(const key in _MACHINE_STATUS.COMMAND_BYTE){
 						if(_MACHINE_STATUS.COMMAND_BYTE[key] == command.toUpperCase()){
-							return {
-								code: key,
-								description: command,
-							};
+							return key;
 						}
 					}
 				}
 
-				if(Number.isInteger(command)){
-					return {
-						code: command,
-						description: _MACHINE_STATUS.COMMAND_BYTE[command],
-					};
-				}
-
-				throw `Error: Command '${command}' is not a valid command`;
+				return command;
 			})();
 
 		const messageId = 0x24;
-		const packet = self._buildPacket([messageId, self._issuedCommand.code], sync);
+		const packet = self._buildPacket([messageId, commandCode], sync);
 
 		return self._request(packet);
 	};
