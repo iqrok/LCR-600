@@ -139,10 +139,6 @@ class LCR600 extends EventEmitter{
 			self._emit('close', received);
 		});
 
-		self.serial.on('data', received => {
-			self._parseReceivedSerial(received);
-		});
-
 		await self.serial.connect();
 	};
 
@@ -153,7 +149,7 @@ class LCR600 extends EventEmitter{
 	 *	@private
 	 *	@param {number} [ms=75] - amount of delay in milliseconds
 	 * */
-	_resetRequestDelay(ms = 75){
+	_resetRequestDelay(ms = 250){
 		const self = this;
 		self._requestDelay = ms;
 	};
@@ -168,7 +164,7 @@ class LCR600 extends EventEmitter{
 	_currentRequestDelay(){
 		const self = this;
 		const _ms = self._requestDelay;
-		const _maxDelay = 150;
+		const _maxDelay = 500;
 
 		if(self._requestDelay++ > _maxDelay){
 			self._requestDelay = _maxDelay
@@ -189,7 +185,7 @@ class LCR600 extends EventEmitter{
 
 		if(code !== 0){
 			self._unsuccessfulResponse(self._messageId, response);
-			return;
+			return response.data;
 		}
 
 		if(self._messageId != undefined){
@@ -241,7 +237,7 @@ class LCR600 extends EventEmitter{
 					break;
 
 				default:
-					// message id will mostly probably 0x20, try to call _handleResponseField()
+					// try to call _handleResponseField() because 0x20 is the most used message id
 					self._handleResponseField(response);
 					break;
 			}
@@ -589,7 +585,7 @@ class LCR600 extends EventEmitter{
 				return code === 0
 					? {
 						code,
-						status: self._parsedDevStatus(this._data[1]),
+						status: self._messageId === 0x00 ? this._data[1] : self._parsedDevStatus(this._data[1]),
 						fieldData: this._data.slice(2),
 					}
 					: {code};
@@ -702,7 +698,9 @@ class LCR600 extends EventEmitter{
 	_buildPacket(message, sync = false){
 		const self = this;
 
-		self._messageId = message[0];
+		if(message[0] !== 0x7d || message[0] !== 0x7e){
+			self._messageId = message[0];
+		}
 
 		return self.begin()
 			.to()
@@ -721,23 +719,27 @@ class LCR600 extends EventEmitter{
 	 * */
 	_request(packet){
 		const self = this;
-		const __waitForResponse = async function(){
+		const __waitForResponse = async function(_packet){
 				return new Promise(async resolve => {
-					await self.serial.write(packet);
+					const raw = await self.serial.request(_packet);
+					const parsed = self._parseResponse(raw);
+					const {code} = parsed.data;
 
-					if(self._messageId == undefined){
-						resolve(true);
+					if(code === 0x26){
+						// handle return code 38 : request has been queued
+						setTimeout(
+								// message ID 0x7d : check request packet
+								() => resolve(__waitForResponse(self._buildPacket([0x7d]))),
+								self._currentRequestDelay()
+							);
+					} else {
+						resolve(self._parseReceivedSerial(raw));
 						return;
 					}
-
-					setTimeout(
-							() => resolve(__waitForResponse()),
-							self._currentRequestDelay()
-						);
 				});
 			};
 
-		return __waitForResponse();
+		return __waitForResponse(packet);
 	};
 
 	/*=========== METHODS FOR BUILDING PACKET ===========*/
