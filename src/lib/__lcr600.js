@@ -360,7 +360,6 @@ class LCR600 extends EventEmitter{
 						});
 				}
 
-				self._setAttribute(summary.name, summary.value);
 				self._emit('data', summary);
 
 				return summary;
@@ -368,14 +367,12 @@ class LCR600 extends EventEmitter{
 
 			case 'LIST':
 				const parsedList = self._parseList(summary, field.n);
-				self._setAttribute(parsedList.name, parsedList.value);
 				self._emit('data', parsedList);
 
 				return parsedList;
 				break;
 
 			case 'TEXT':
-				self._setAttribute(summary.name, summary.value);
 				self._emit('data', summary);
 
 				return summary;
@@ -604,7 +601,7 @@ class LCR600 extends EventEmitter{
 				return code === 0
 					? {
 						code,
-						status: self._messageId === 0x00 ? this._data[1] : self._parsedDevStatus(this._data[1]),
+						status: self._messageId === 0x00 ? this._data[1] : self._parseDevStatus(this._data[1]),
 						fieldData: this._data.slice(2),
 					}
 					: {code};
@@ -619,7 +616,7 @@ class LCR600 extends EventEmitter{
 	 *	@param {byte} _byte - device status byte
 	 *	@returns {Object} - current device status
 	 * */
-	_parsedDevStatus(_byte){
+	_parseDevStatus(_byte){
 		const self = this;
 
 		const switchByte = _byte & 0x0f;
@@ -683,14 +680,27 @@ class LCR600 extends EventEmitter{
 					code: codes.printerStatus,
 					description: _MACHINE_STATUS.PRINTER_STATUS[codes.printerStatus],
 				},
-				deliveryStatus: {
-					code: codes.deliveryStatus.raw,
-					description: _MACHINE_STATUS.DELIVERY_STATUS[codes.deliveryStatus.high] + ' ' + _MACHINE_STATUS.DELIVERY_STATUS[codes.deliveryStatus.low],
-				},
-				deliveryCode: {
-					code: codes.deliveryCode.raw,
-					description: _MACHINE_STATUS.DELIVERY_CODE[codes.deliveryCode.high] + ' ' + _MACHINE_STATUS.DELIVERY_CODE[codes.deliveryCode.low],
-				},
+				deliveryStatus: [
+					{
+						code: codes.deliveryStatus.high,
+						description: _MACHINE_STATUS.DELIVERY_STATUS[codes.deliveryStatus.high],
+					},
+					{
+						code: codes.deliveryStatus.low,
+						description: _MACHINE_STATUS.DELIVERY_STATUS[codes.deliveryStatus.low],
+					}
+				],
+				deliveryCode:
+				[
+					{
+						code: codes.deliveryCode.high,
+						description: _MACHINE_STATUS.DELIVERY_CODE[codes.deliveryCode.low],
+					},
+					{
+						code: codes.deliveryCode.low,
+						description: _MACHINE_STATUS.DELIVERY_CODE[codes.deliveryCode.low],
+					},
+				],
 			};
 	};
 
@@ -704,7 +714,8 @@ class LCR600 extends EventEmitter{
 	_setAttribute(key, value){
 		const self = this;
 		self.attributes[key] = value;
-		return self.attributes[key];
+
+		return self.getAttribute(key, false);
 	};
 
 	/**
@@ -949,9 +960,11 @@ class LCR600 extends EventEmitter{
 	 *	@param {string} fieldName - Field Name of requested attribute value
 	 *	@returns {Object} - current process's attributes
 	 * */
-	requestAttribute(fieldName){
+	async requestAttribute(fieldName){
 		const self = this;
-		return self.getData(fieldName);
+		const field = await self.getData(fieldName);
+
+		return self._setAttribute(field.data.name, field.data.value);
 	};
 
 	/**
