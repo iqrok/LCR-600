@@ -83,7 +83,10 @@ class LCR600 extends EventEmitter{
 	 * */
 	constructor(config, debug = false){
 		super();
-		this.init(config, debug);
+
+		if(config != undefined){
+			this.init(config, debug);
+		}
 	};
 
 	/**
