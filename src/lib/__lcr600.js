@@ -184,6 +184,8 @@ class LCR600 extends EventEmitter{
 		const response = self._parseResponse(received);
 		const {code, status, fieldData} = response.data;
 
+		let data = undefined;
+
 		if(code !== 0){
 			self._unsuccessfulResponse(self._messageId, response);
 			return response.data;
@@ -200,11 +202,13 @@ class LCR600 extends EventEmitter{
 
 					self._setAttribute(summary.name, summary.value);
 					self._emit('data', summary);
+
+					data = summary;
 					break;
 
 				// Get Field Request
 				case 0x20:
-					self._handleResponseField(response);
+					data = self._handleResponseField(response);
 					break;
 
 				// Set Field Request
@@ -213,19 +217,23 @@ class LCR600 extends EventEmitter{
 
 				// Device Status Request
 				case 0x23:
-					self._emit('data', {
-							name: 'machineStatus',
-							status: self._parseReturnCodes(code),
-							value: self._parseMachineStatus([...fieldData]),
-						});
+					data = {
+						name: 'machineStatus',
+						status: self._parseReturnCodes(code),
+						value: self._parseMachineStatus([...fieldData]),
+					};
+
+					self._emit('data', data);
 					break;
 
 				// Issue Command Request
 				case 0x24:
-					self._emit('data', {
-							name: 'issueCommand',
-							status: self._parseReturnCodes(code),
-						});
+					data = {
+						name: 'issueCommand',
+						status: self._parseReturnCodes(code),
+					};
+
+					self._emit('data', data);
 
 					break;
 
@@ -239,7 +247,7 @@ class LCR600 extends EventEmitter{
 
 				default:
 					// try to call _handleResponseField() because 0x20 is the most used message id
-					self._handleResponseField(response);
+					data = self._handleResponseField(response);
 					break;
 			}
 
@@ -247,7 +255,7 @@ class LCR600 extends EventEmitter{
 			self._resetRequestDelay();
 		}
 
-		return {code, status, fieldData};
+		return {code, status, data};
 	};
 
 	/**
@@ -355,17 +363,22 @@ class LCR600 extends EventEmitter{
 				self._setAttribute(summary.name, summary.value);
 				self._emit('data', summary);
 
+				return summary;
 				break;
 
 			case 'LIST':
 				const parsedList = self._parseList(summary, field.n);
 				self._setAttribute(parsedList.name, parsedList.value);
 				self._emit('data', parsedList);
+
+				return parsedList;
 				break;
 
 			case 'TEXT':
 				self._setAttribute(summary.name, summary.value);
 				self._emit('data', summary);
+
+				return summary;
 				break;
 		}
 	};
@@ -505,7 +518,10 @@ class LCR600 extends EventEmitter{
 					break;
 			};
 		} catch(error){
-			console.error('_readFieldData Error:', this._messageId, buffer, error);
+			if(self.debug){
+				console.error('_readFieldData Error:', this._messageId, buffer, error);
+			}
+
 			return null;
 		}
 	};
@@ -1019,10 +1035,35 @@ class LCR600 extends EventEmitter{
 	 * */
 	interruptSummary(fieldName){
 		const self = this;
+
+		// if fieldName is not being summarized, dont hit the interrupt
+		if(!_RECEIVED_DATA[fieldName].onProcess){
+			return false;
+		}
+
 		self._interruptSummarize = fieldName;
 
 		// exec getData in order to get summary calculated
 		return self.getData(fieldName);
+	};
+
+	/**
+	 *	Interrupt summary calculation. Call if you want to ger summary immediately wihtout waiting for waitingTime to be elapsed
+	 *	@param {string} fieldName - field name which summary want to be interrupted
+	 *	@returns {boolean} - write status
+	 * */
+	async resetSummary(fieldName){
+		const self = this;
+
+		// reset will work if data summary is already initialized
+		if(!_RECEIVED_DATA[fieldName]){
+			return false;
+		}
+
+		const current = await self.getData(fieldName);
+		_RECEIVED_DATA[fieldName] = new ___RECEIVED_DATA__(current.data.value);
+
+		return current;
 	};
 
 	/**
