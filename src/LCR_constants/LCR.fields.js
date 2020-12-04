@@ -45,6 +45,10 @@ module.exports = {
 			id: 24,
 			type: 'TEXT',
 		},
+	NoFlowTimer_DL: {
+			id: 25,
+			type: 'INTEGER',
+		},
 	Temp_WM: {
 			id: 33,
 			type: 'SFLOAT',
