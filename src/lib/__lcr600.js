@@ -177,6 +177,7 @@ class LCR600 extends EventEmitter{
 	 *	Parse received serial response from LCR600
 	 *	@private
 	 *	@param {Array<byte>} received - array of bytes received from LCR600
+	 *	@return {Object} - returns {code, status, fieldData} parsed from LCR600 response
 	 * */
 	_parseReceivedSerial(received){
 		const self = this;
@@ -245,6 +246,8 @@ class LCR600 extends EventEmitter{
 			self._messageId = undefined;
 			self._resetRequestDelay();
 		}
+
+		return {code, status, fieldData};
 	};
 
 	/**
