@@ -445,7 +445,10 @@ class LCR600 extends EventEmitter{
 		if(
 			_RECEIVED_DATA[data.name].onProcess
 			&& _RECEIVED_DATA[data.name].lastValue === data.value
-			&& ((Date.now() - _RECEIVED_DATA[data.name].sameValueTimer) > self._msLimit || self._interruptSummarize === data.name)
+			&& (
+				((Date.now() - _RECEIVED_DATA[data.name].sameValueTimer) > self._msLimit && self._msLimit > 0)
+				|| self._interruptSummarize === data.name
+			)
 		){
 			// assign last value when process is finished
 			_RECEIVED_DATA[data.name].summary.value.finish = data.value;
