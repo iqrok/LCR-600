@@ -187,17 +187,17 @@ class LCR600 extends EventEmitter{
 		const response = self._parseResponse(received);
 		const {code, status, fieldData} = response.data;
 
-		let data = undefined;
+		let data = {};
 
 		if(code !== 0){
-			self._unsuccessfulResponse(self._messageId, response);
+			self._unsuccessfulResponse(self._messageId, response.data);
 			return response.data;
 		}
 
 		if(self._messageId != undefined){
 			switch(self._messageId){
 				// Product Id Request
-				case 0x00:
+				case 0x00: {
 					const summary = {
 							name: 'productId',
 							value: self._readFieldData(fieldData, 'TEXT'),
@@ -208,57 +208,65 @@ class LCR600 extends EventEmitter{
 
 					data = summary;
 					break;
+				}
 
 				// Get Field Request
-				case 0x20:
+				case 0x20: {
 					data = self._handleResponseField(response);
 					break;
+				}
 
 				// Set Field Request
-				case 0x21:
+				case 0x21: {
 					break;
+				}
 
 				// Device Status Request
-				case 0x23:
+				case 0x23: {
 					data = {
-						name: 'machineStatus',
 						status: self._parseReturnCodes(code),
+						name: 'machineStatus',
 						value: self._parseMachineStatus([...fieldData]),
 					};
 
 					self._emit('data', data);
 					break;
+				}
 
 				// Issue Command Request
-				case 0x24:
+				case 0x24: {
 					data = {
-						name: 'issueCommand',
 						status: self._parseReturnCodes(code),
+						name: 'issueCommand',
 					};
 
 					self._emit('data', data);
 
 					break;
+				}
 
 				// Set Device Address Request
-				case 0x25:
+				case 0x25: {
 					break;
+				}
 
 				// Set Baud Rate Request
-				case 0x7C:
+				case 0x7C: {
 					break;
+				}
 
-				default:
+				default: {
 					// try to call _handleResponseField() because 0x20 is the most used message id
 					data = self._handleResponseField(response);
 					break;
+				}
 			}
 
 			self._messageId = undefined;
 			self._resetRequestDelay();
 		}
 
-		return {code, status, data};
+		return {code, ...data};
 	};
 
 	/**
@@ -291,7 +299,7 @@ class LCR600 extends EventEmitter{
 					self._currentField = undefined;
 
 					return {
-						...self._parseReturnCodes(response.data.code),
+						...self._parseReturnCodes(response.code),
 						name: self._getFieldNameById(field.id),
 						messageId: {
 							code: messageId,
@@ -300,7 +308,7 @@ class LCR600 extends EventEmitter{
 					};
 				} else {
 					return {
-						...self._parseReturnCodes(response.data.code),
+						...self._parseReturnCodes(response.code),
 						messageId: {
 							code: messageId,
 							description: _MESSAGEID[messageId],
@@ -331,9 +339,9 @@ class LCR600 extends EventEmitter{
 
 		const type = field.type.toUpperCase();
 		const summary = {
+				status,
 				name: self._getFieldNameById(field.id),
 				value: self._readFieldData(fieldData, field.type),
-				status,
 			};
 
 		switch(type){
@@ -342,7 +350,7 @@ class LCR600 extends EventEmitter{
 			case 'UFLOAT':
 			case 'SFLOAT':
 			case 'INTEGER':
-			case 'VOLUME':
+			case 'VOLUME': {
 				const summarize = self._summarize(summary);
 
 				if(summarize){
@@ -367,19 +375,22 @@ class LCR600 extends EventEmitter{
 
 				return summary;
 				break;
+			}
 
-			case 'LIST':
+			case 'LIST': {
 				const parsedList = self._parseList(summary, field.n);
 				self._emit('data', parsedList);
 
 				return parsedList;
 				break;
+			}
 
-			case 'TEXT':
+			case 'TEXT': {
 				self._emit('data', summary);
 
 				return summary;
 				break;
+			}
 		}
 	};
 
@@ -483,6 +494,8 @@ class LCR600 extends EventEmitter{
 	 *	@returns {number|string} - Translated Buffer
 	 * */
 	_readFieldData(buffer, type){
+		const self = this;
+
 		try{
 			type = type.toUpperCase();
 			switch(type){
@@ -970,7 +983,7 @@ class LCR600 extends EventEmitter{
 		const self = this;
 		const field = await self.getData(fieldName);
 
-		return self._setAttribute(field.data.name, field.data.value);
+		return self._setAttribute(field.name, field.value);
 	};
 
 	/**
@@ -1080,7 +1093,7 @@ class LCR600 extends EventEmitter{
 		}
 
 		const current = await self.getData(fieldName);
-		_RECEIVED_DATA[fieldName] = new ___RECEIVED_DATA__(current.data.value);
+		_RECEIVED_DATA[fieldName] = new ___RECEIVED_DATA__(current.value);
 
 		return current;
 	};
