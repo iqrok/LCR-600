@@ -18,8 +18,9 @@ const __TEMPLATE__ = function(to = 0x00, from = 0xff){
 };
 
 /** Template to store flow process **/
-const ___RECEIVED_DATA__ = function(lastValue = null){
+const __RECEIVED_DATA__ = function(lastValue = null, qty = 0){
 	this.lastValue = lastValue;
+	this.maxQty = qty ? qty : 0;
 	this.onProcess = false;
 	this.sameValueTimer = 0;
 	this.summary = {
@@ -435,7 +436,7 @@ class LCR600 extends EventEmitter{
 		// create template for current data if it doesnt exist yet
 		if(!_RECEIVED_DATA[data.name]){
 			// set current value as lastValue when creating templates
-			_RECEIVED_DATA[data.name] = new ___RECEIVED_DATA__(data.value);
+			_RECEIVED_DATA[data.name] = new __RECEIVED_DATA__(data.value);
 		}
 
 		// when current value is different than last value, assume flow process is started
@@ -462,12 +463,14 @@ class LCR600 extends EventEmitter{
 			&& (
 				((Date.now() - _RECEIVED_DATA[data.name].sameValueTimer) > self._msLimit && self._msLimit > 0)
 				|| self._interruptSummarize === data.name
+				|| (Math.abs(data.value - _RECEIVED_DATA[data.name].summary.value.start) >= _RECEIVED_DATA[data.name].maxQty && _RECEIVED_DATA[data.name].maxQty > 0)
 			)
 		){
 			// assign last value when process is finished
 			_RECEIVED_DATA[data.name].summary.value.finish = data.value;
 			_RECEIVED_DATA[data.name].summary.time.finish = new Date(Date.now() - (self._interruptSummarize === data.name ? 0 : self._msLimit)); // finished time is compensated with delay ms
 			_RECEIVED_DATA[data.name].onProcess = false;
+			_RECEIVED_DATA[data.name].maxQty = 0;
 
 			// reset counter
 			_RECEIVED_DATA[data.name].sameValueTimer = Date.now();
@@ -1084,7 +1087,7 @@ class LCR600 extends EventEmitter{
 	 *	@param {string} fieldName - field name which summary want to be interrupted
 	 *	@returns {boolean} - write status
 	 * */
-	async resetSummary(fieldName){
+	async resetSummary(fieldName, maxQty = 0){
 		const self = this;
 
 		// reset will work if data summary is already initialized
@@ -1093,7 +1096,7 @@ class LCR600 extends EventEmitter{
 		}
 
 		const current = await self.getData(fieldName);
-		_RECEIVED_DATA[fieldName] = new ___RECEIVED_DATA__(current.value);
+		_RECEIVED_DATA[fieldName] = new __RECEIVED_DATA__(current.value, maxQty);
 
 		return current;
 	};
